@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 - 문제 관리</title>
+  <link rel="stylesheet" href="/src/style.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Malgun Gothic', sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      margin: 20px 0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 5px;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+    .form-group {
+      margin: 20px 0;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #333;
+    }
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+    }
+    .form-group textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    .problem-item {
+      padding: 15px;
+      margin: 10px 0;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+    .problem-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .options-input {
+      margin: 10px 0;
+    }
+    .option-input {
+      display: flex;
+      gap: 10px;
+      margin: 5px 0;
+    }
+    .option-input input {
+      flex: 1;
+    }
+    .option-input input[type="radio"] {
+      width: auto;
+    }
+    .pdf-preview {
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .pdf-text {
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .hidden {
+      display: none;
+    }
+    .status-message {
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+    }
+    .status-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .problem-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔧 관리자 - 문제 관리</h1>
+    <div>
+      <button class="btn btn-secondary" onclick="location.href='/'">홈으로</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- 안내 메시지 -->
+    <div class="card" style="background: #e7f3ff; border-left: 4px solid #2196F3;">
+      <h2>📋 문제 등록 안내</h2>
+      <p style="margin: 10px 0; line-height: 1.6;">
+        <strong>작동 방식:</strong><br>
+        1. 관리자(개발자)가 PDF에서 문제를 추출하여 Firestore에 저장합니다.<br>
+        2. 학생이 단원을 선택하면 <strong>자동으로 Firestore에서 문제가 로드</strong>됩니다.<br>
+        3. 학생은 PDF를 업로드할 필요가 없습니다.
+      </p>
+    </div>
+
+    <!-- PDF 업로드 및 파싱 -->
+    <div class="card">
+      <h2>📄 1단계: PDF에서 문제 텍스트 추출</h2>
+      <p style="color: #666; margin-bottom: 20px;">
+        단원평가 PDF 파일을 업로드하여 텍스트를 추출합니다. 추출된 텍스트를 참고하여 아래에서 문제를 입력하세요.
+      </p>
+      <div class="form-group">
+        <label>PDF 파일 업로드</label>
+        <input type="file" id="pdfFileInput" accept=".pdf">
+      </div>
+      <button class="btn btn-primary" id="parsePdfBtn">PDF 텍스트 추출하기</button>
+      <div id="pdfPreview" class="pdf-preview hidden">
+        <h3>추출된 텍스트 (아래 입력 폼에서 참고하세요):</h3>
+        <div id="pdfText" class="pdf-text"></div>
+      </div>
+    </div>
+
+    <!-- 문제 수동 입력 -->
+    <div class="card">
+      <h2>📝 2단계: 문제 입력 및 Firestore 저장</h2>
+      <p style="color: #666; margin-bottom: 20px;">
+        위에서 추출한 PDF 텍스트를 참고하여 각 문제를 입력하세요. 저장된 문제는 학생이 단원을 선택하면 <strong>자동으로 로드</strong>됩니다.
+      </p>
+      <div class="form-group">
+        <label>학년</label>
+        <select id="problemGrade">
+          <option value="5" selected>5학년</option>
+          <option value="4">4학년</option>
+          <option value="6">6학년</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>단원</label>
+        <select id="problemUnit">
+          <option value="1">1단원</option>
+          <option value="2">2단원</option>
+          <option value="3">3단원</option>
+          <option value="4">4단원</option>
+          <option value="5">5단원</option>
+          <option value="6">6단원</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>난이도</label>
+        <select id="problemDifficulty">
+          <option value="1">⭐ 쉬움</option>
+          <option value="2">⭐⭐ 보통</option>
+          <option value="3">⭐⭐⭐ 어려움</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>문제 유형</label>
+        <select id="problemType">
+          <option value="multiple">객관식</option>
+          <option value="short">주관식</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>문제 내용</label>
+        <textarea id="problemQuestion" placeholder="문제를 입력하세요"></textarea>
+      </div>
+      <div id="optionsSection" class="form-group">
+        <label>보기 (객관식인 경우)</label>
+        <div class="options-input">
+          <div class="option-input">
+            <input type="radio" name="correctOption" value="0" checked>
+            <input type="text" id="option0" placeholder="보기 1">
+          </div>
+          <div class="option-input">
+            <input type="radio" name="correctOption" value="1">
+            <input type="text" id="option1" placeholder="보기 2">
+          </div>
+          <div class="option-input">
+            <input type="radio" name="correctOption" value="2">
+            <input type="text" id="option2" placeholder="보기 3">
+          </div>
+          <div class="option-input">
+            <input type="radio" name="correctOption" value="3">
+            <input type="text" id="option3" placeholder="보기 4">
+          </div>
+        </div>
+        <small>정답인 보기에 라디오 버튼을 선택하세요</small>
+      </div>
+      <div id="answerSection" class="form-group hidden">
+        <label>정답 (주관식인 경우)</label>
+        <input type="text" id="problemAnswer" placeholder="정답을 입력하세요">
+      </div>
+      <button class="btn btn-success" id="addProblemBtn">문제 추가</button>
+    </div>
+
+    <!-- 저장된 문제 목록 -->
+    <div class="card">
+      <h2>✅ 저장된 문제 목록 (학생 화면에서 자동 로드됨)</h2>
+      <p style="color: #666; margin-bottom: 20px;">
+        아래 목록에 표시된 문제들이 학생 화면에서 자동으로 로드됩니다. 학생이 해당 학년/단원을 선택하면 Firestore에서 문제를 가져옵니다.
+      </p>
+      <div class="form-group">
+        <label>필터</label>
+        <div style="display: flex; gap: 10px;">
+          <select id="filterGradeList">
+            <option value="">전체 학년</option>
+            <option value="4">4학년</option>
+            <option value="5">5학년</option>
+            <option value="6">6학년</option>
+          </select>
+          <select id="filterUnitList">
+            <option value="">전체 단원</option>
+            <option value="1">1단원</option>
+            <option value="2">2단원</option>
+            <option value="3">3단원</option>
+            <option value="4">4단원</option>
+            <option value="5">5단원</option>
+            <option value="6">6단원</option>
+          </select>
+        </div>
+      </div>
+      <div id="statusMessage"></div>
+      <div id="problemsList" class="problem-list"></div>
+      <button class="btn btn-primary" id="loadProblemsBtn">문제 목록 새로고침</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/admin.js"></script>
+</body>
+</html>
+

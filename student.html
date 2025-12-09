@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>학생 - 수학 오답노트</title>
+  <link rel="stylesheet" href="/src/style.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Malgun Gothic', sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+    .card {
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      margin: 20px 0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 5px;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+    .select-group {
+      margin: 20px 0;
+    }
+    .select-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #333;
+    }
+    .select-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    .difficulty-selector {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    .difficulty-btn {
+      flex: 1;
+      padding: 15px;
+      border: 2px solid #ddd;
+      background: white;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    .difficulty-btn.active {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
+    }
+    .question-card {
+      margin: 20px 0;
+      padding: 25px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+    }
+    .question-number {
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+    .options {
+      margin: 15px 0;
+    }
+    .option {
+      padding: 12px;
+      margin: 8px 0;
+      background: white;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .option:hover {
+      border-color: #667eea;
+    }
+    .option.selected {
+      border-color: #667eea;
+      background: #e7e9fd;
+    }
+    .option.correct {
+      border-color: #28a745;
+      background: #d4edda;
+    }
+    .option.incorrect {
+      border-color: #dc3545;
+      background: #f8d7da;
+    }
+    .short-answer-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      margin: 10px 0;
+    }
+    .result-summary {
+      text-align: center;
+      padding: 30px;
+    }
+    .result-score {
+      font-size: 48px;
+      font-weight: bold;
+      color: #667eea;
+      margin: 20px 0;
+    }
+    .wrong-problem-list {
+      margin: 20px 0;
+    }
+    .wrong-problem-item {
+      padding: 15px;
+      margin: 10px 0;
+      background: #fff3cd;
+      border-radius: 8px;
+      border-left: 4px solid #ffc107;
+    }
+    .reason-selector {
+      margin: 15px 0;
+    }
+    .reason-option {
+      padding: 10px;
+      margin: 5px;
+      background: white;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-block;
+    }
+    .reason-option.selected {
+      border-color: #667eea;
+      background: #e7e9fd;
+    }
+    .custom-reason-input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+    }
+    .canvas-container {
+      margin: 20px 0;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      background: white;
+    }
+    .canvas-toolbar {
+      padding: 10px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      gap: 10px;
+    }
+    #drawingCanvas {
+      display: block;
+      cursor: crosshair;
+    }
+    .answer-mode-selector {
+      margin: 20px 0;
+      padding: 20px;
+      background: #e7e9fd;
+      border-radius: 10px;
+    }
+    .answer-mode-selector label {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+    .answer-mode-selector input[type="radio"] {
+      margin-right: 10px;
+    }
+    .note-list {
+      margin: 20px 0;
+    }
+    .note-item {
+      padding: 20px;
+      margin: 15px 0;
+      background: white;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .note-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .note-date {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📚 수학 오답노트 - 학생</h1>
+    <div>
+      <span id="userName"></span>
+      <button class="btn btn-secondary" onclick="location.href='/'">홈으로</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- 단원 선택 화면 -->
+    <div id="unitSelectScreen" class="screen active">
+      <div class="card">
+        <h2>단원 선택</h2>
+        <div class="select-group">
+          <label>학년 선택</label>
+          <select id="gradeSelect">
+            <option value="4">4학년</option>
+            <option value="5" selected>5학년</option>
+            <option value="6">6학년</option>
+          </select>
+        </div>
+        <div class="select-group">
+          <label>단원 선택</label>
+          <select id="unitSelect">
+            <option value="1">1단원</option>
+            <option value="2">2단원</option>
+            <option value="3">3단원</option>
+            <option value="4">4단원</option>
+            <option value="5">5단원</option>
+            <option value="6">6단원</option>
+          </select>
+        </div>
+        <div class="select-group">
+          <label>난이도 선택</label>
+          <div class="difficulty-selector">
+            <div class="difficulty-btn" data-difficulty="1">
+              ⭐ 쉬움
+            </div>
+            <div class="difficulty-btn" data-difficulty="2">
+              ⭐⭐ 보통
+            </div>
+            <div class="difficulty-btn" data-difficulty="3">
+              ⭐⭐⭐ 어려움
+            </div>
+          </div>
+        </div>
+        <div class="answer-mode-selector">
+          <h3>정답 확인 방식</h3>
+          <label>
+            <input type="radio" name="answerMode" value="immediate" checked>
+            즉시 정답 확인
+          </label>
+          <label>
+            <input type="radio" name="answerMode" value="after">
+            모든 문제 풀이 후 정답 확인
+          </label>
+        </div>
+        <button class="btn btn-primary" id="startBtn" style="width: 100%; margin-top: 20px;">
+          문제 풀이 시작
+        </button>
+      </div>
+      <div class="card">
+        <h2>📖 오답노트 보기</h2>
+        <button class="btn btn-primary" id="viewNotesBtn" style="width: 100%;">
+          내 오답노트 보기
+        </button>
+      </div>
+    </div>
+
+    <!-- 문제 풀이 화면 -->
+    <div id="quizScreen" class="screen">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 id="quizTitle"></h2>
+          <div>
+            <span id="progressText"></span>
+            <button class="btn btn-secondary" id="submitQuizBtn">제출하기</button>
+          </div>
+        </div>
+        <div id="questionsContainer"></div>
+      </div>
+    </div>
+
+    <!-- 결과 화면 -->
+    <div id="resultScreen" class="screen">
+      <div class="card result-summary">
+        <h2>결과</h2>
+        <div class="result-score" id="resultScore"></div>
+        <p id="resultText"></p>
+        <div id="wrongProblemsContainer" class="wrong-problem-list"></div>
+        <button class="btn btn-primary" id="createNoteBtn" style="margin-top: 20px;">
+          오답노트 작성하기
+        </button>
+        <button class="btn btn-secondary" id="backToSelectBtn" style="margin-top: 10px;">
+          단원 선택으로 돌아가기
+        </button>
+      </div>
+    </div>
+
+    <!-- 오답노트 작성 화면 -->
+    <div id="noteCreateScreen" class="screen">
+      <div class="card">
+        <h2>오답노트 작성</h2>
+        <div id="noteProblemsContainer"></div>
+        <button class="btn btn-success" id="saveNoteBtn" style="width: 100%; margin-top: 20px;">
+          오답노트 저장하기
+        </button>
+        <button class="btn btn-secondary" id="cancelNoteBtn" style="width: 100%; margin-top: 10px;">
+          취소
+        </button>
+      </div>
+    </div>
+
+    <!-- 오답노트 목록 화면 -->
+    <div id="notesListScreen" class="screen">
+      <div class="card">
+        <h2>내 오답노트</h2>
+        <div id="notesList" class="note-list"></div>
+        <button class="btn btn-secondary" id="backToSelectFromNotesBtn" style="width: 100%; margin-top: 20px;">
+          단원 선택으로 돌아가기
+        </button>
+      </div>
+    </div>
+
+    <!-- 오답노트 상세 화면 -->
+    <div id="noteDetailScreen" class="screen">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2>오답노트 상세</h2>
+          <button class="btn btn-secondary" id="backToNotesListBtn">목록으로</button>
+        </div>
+        <div id="noteDetailContent"></div>
+        <button class="btn btn-primary" id="retryBtn" style="width: 100%; margin-top: 20px;">
+          재도전하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/student.js"></script>
+</body>
+</html>
+
