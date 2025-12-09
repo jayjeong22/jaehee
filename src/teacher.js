@@ -190,8 +190,8 @@ function renderWrongRateChart(results) {
       datasets: [{
         label: '오답 횟수',
         data: wrongCounts,
-        backgroundColor: 'rgba(220, 53, 69, 0.6)',
-        borderColor: 'rgba(220, 53, 69, 1)',
+        backgroundColor: 'rgba(255, 221, 221, 0.5)',
+        borderColor: 'rgba(255, 221, 221, 0.8)',
         borderWidth: 1
       }]
     },
@@ -272,16 +272,16 @@ function renderStudentNotes(userId) {
     noteDiv.innerHTML = `
       <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
         <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
-        <span style="color: #666; font-size: 14px;">
+        <span style="color: #8B8BAA; font-size: 14px;">
           ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
         </span>
       </div>
       <p>틀린 문제 ${note.problems.length}개</p>
       <div style="margin-top: 10px;">
         ${note.problems.map((p, idx) => `
-          <div style="margin: 5px 0; padding: 8px; background: white; border-radius: 5px;">
+          <div style="margin: 5px 0; padding: 8px; background: #FFFFFF; border-radius: 5px;">
             문제 ${idx + 1}: ${p.reason || '원인 미입력'}
-            ${p.drawing ? '<span style="color: #28a745;">(손글씨 포함)</span>' : ''}
+            ${p.drawing ? '<span style="color: #DDFFDD;">(손글씨 포함)</span>' : ''}
           </div>
         `).join('')}
       </div>

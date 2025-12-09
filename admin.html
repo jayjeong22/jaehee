@@ -13,12 +13,12 @@
     }
     body {
       font-family: 'Malgun Gothic', sans-serif;
-      background: #f5f7fa;
+      background: #F5F5FF;
       min-height: 100vh;
     }
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: linear-gradient(135deg, #DDDDFF 0%, #E5DDFF 100%);
+      color: #6B6B8A;
       padding: 20px;
       display: flex;
       justify-content: space-between;
@@ -30,11 +30,12 @@
       padding: 20px;
     }
     .card {
-      background: white;
+      background: #FFFFFF;
       border-radius: 15px;
       padding: 30px;
       margin: 20px 0;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(221, 221, 255, 0.3);
+      border: 1px solid #E5DDFF;
     }
     .btn {
       padding: 12px 24px;
@@ -46,23 +47,23 @@
       transition: all 0.3s;
     }
     .btn-primary {
-      background: #667eea;
-      color: white;
+      background: #DDDDFF;
+      color: #6B6B8A;
     }
     .btn-primary:hover {
-      background: #5568d3;
+      background: #E5DDFF;
     }
     .btn-secondary {
-      background: #6c757d;
-      color: white;
+      background: #E5DDFF;
+      color: #6B6B8A;
     }
     .btn-success {
-      background: #28a745;
-      color: white;
+      background: #DDFFDD;
+      color: #6B6B8A;
     }
     .btn-danger {
-      background: #dc3545;
-      color: white;
+      background: #FFDDDD;
+      color: #6B6B8A;
     }
     .form-group {
       margin: 20px 0;
@@ -71,17 +72,19 @@
       display: block;
       margin-bottom: 8px;
       font-weight: bold;
-      color: #333;
+      color: #6B6B8A;
     }
     .form-group select,
     .form-group input,
     .form-group textarea {
       width: 100%;
       padding: 12px;
-      border: 2px solid #ddd;
+      border: 2px solid #E5DDFF;
+      background: #FFFFFF;
       border-radius: 8px;
       font-size: 16px;
       font-family: inherit;
+      color: #6B6B8A;
     }
     .form-group textarea {
       min-height: 100px;
@@ -90,9 +93,9 @@
     .problem-item {
       padding: 15px;
       margin: 10px 0;
-      background: #f8f9fa;
+      background: #F5F5FF;
       border-radius: 8px;
-      border-left: 4px solid #667eea;
+      border-left: 4px solid #DDDDFF;
     }
     .problem-header {
       display: flex;
@@ -117,7 +120,7 @@
     .pdf-preview {
       margin: 20px 0;
       padding: 20px;
-      background: #f8f9fa;
+      background: #F5F5FF;
       border-radius: 8px;
       max-height: 400px;
       overflow-y: auto;
@@ -136,14 +139,14 @@
       border-radius: 8px;
     }
     .status-success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
+      background: #F0FFF0;
+      color: #6B6B8A;
+      border: 1px solid #DDFFDD;
     }
     .status-error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
+      background: #FFF0F0;
+      color: #6B6B8A;
+      border: 1px solid #FFDDDD;
     }
     .problem-list {
       max-height: 600px;
@@ -161,7 +164,7 @@
 
   <div class="container">
     <!-- 안내 메시지 -->
-    <div class="card" style="background: #e7f3ff; border-left: 4px solid #2196F3;">
+    <div class="card" style="background: #E5DDFF; border-left: 4px solid #DDDDFF;">
       <h2>📋 문제 등록 안내</h2>
       <p style="margin: 10px 0; line-height: 1.6;">
         <strong>작동 방식:</strong><br>
@@ -216,9 +219,9 @@
       <div class="form-group">
         <label>난이도</label>
         <select id="problemDifficulty">
-          <option value="1">⭐ 쉬움</option>
-          <option value="2">⭐⭐ 보통</option>
-          <option value="3">⭐⭐⭐ 어려움</option>
+          <option value="1">🌱 쉬움</option>
+          <option value="2">🌱🌱 보통</option>
+          <option value="3">🌱🌱🌱 어려움</option>
         </select>
       </div>
       <div class="form-group">

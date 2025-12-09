@@ -228,19 +228,19 @@ function checkAnswerImmediate(problem, userAnswer, element) {
     userAnswers[problem.id] = userAnswer;
     
     if (isCorrect) {
-      element.style.borderColor = '#28a745';
-      element.style.background = '#d4edda';
+      element.style.borderColor = '#DDFFDD';
+      element.style.background = '#F0FFF0';
     } else {
-      element.style.borderColor = '#dc3545';
-      element.style.background = '#f8d7da';
+      element.style.borderColor = '#FFDDDD';
+      element.style.background = '#FFF0F0';
     }
   }
   
   const feedbackDiv = document.getElementById(`feedback-${problem.id}`);
   if (feedbackDiv) {
     feedbackDiv.innerHTML = isCorrect 
-      ? '<span style="color: #28a745;">✓ 정답입니다!</span>'
-      : `<span style="color: #dc3545;">✗ 오답입니다. 정답: ${problem.type === 'multiple' ? problem.options[problem.correct] : problem.answer}</span>`;
+      ? '<span style="color: #DDFFDD;">✓ 정답입니다!</span>'
+      : `<span style="color: #FFDDDD;">✗ 오답입니다. 정답: ${problem.type === 'multiple' ? problem.options[problem.correct] : problem.answer}</span>`;
   }
   
   updateProgress();
@@ -313,7 +313,7 @@ function showResult() {
   wrongContainer.innerHTML = '';
   
   if (wrongProblems.length === 0) {
-    wrongContainer.innerHTML = '<p style="color: #28a745; font-size: 18px;">모든 문제를 맞추셨습니다! 🎉</p>';
+    wrongContainer.innerHTML = '<p style="color: #DDFFDD; font-size: 18px;">모든 문제를 맞추셨습니다! 🎉</p>';
   } else {
     wrongProblems.forEach((problem, index) => {
       const wrongDiv = document.createElement('div');
@@ -321,8 +321,8 @@ function showResult() {
       wrongDiv.innerHTML = `
         <strong>문제 ${currentProblems.findIndex(p => p.id === problem.id) + 1}</strong><br>
         ${problem.question}<br>
-        <span style="color: #dc3545;">내 답: ${problem.userAnswer}</span><br>
-        <span style="color: #28a745;">정답: ${problem.correctAnswer}</span>
+        <span style="color: #FFDDDD;">내 답: ${problem.userAnswer}</span><br>
+        <span style="color: #DDFFDD;">정답: ${problem.correctAnswer}</span>
       `;
       wrongContainer.appendChild(wrongDiv);
     });
@@ -383,8 +383,8 @@ function showNoteCreateScreen() {
       <div class="question-number">틀린 문제 ${index + 1}</div>
       <div class="question-text">${problem.question}</div>
       <div style="margin: 10px 0;">
-        <span style="color: #dc3545;">내 답: ${problem.userAnswer}</span><br>
-        <span style="color: #28a745;">정답: ${problem.correctAnswer}</span>
+        <span style="color: #FFDDDD;">내 답: ${problem.userAnswer}</span><br>
+        <span style="color: #DDFFDD;">정답: ${problem.correctAnswer}</span>
       </div>
       <div class="reason-selector">
         <label>오답 원인 선택:</label>
@@ -614,13 +614,13 @@ function showNoteDetail(noteId, note) {
       <div class="question-number">문제 ${index + 1}</div>
       <div class="question-text">${problem.question}</div>
       <div style="margin: 10px 0;">
-        <span style="color: #dc3545;">내 답: ${problem.userAnswer}</span><br>
-        <span style="color: #28a745;">정답: ${problem.correctAnswer}</span>
+        <span style="color: #FFDDDD;">내 답: ${problem.userAnswer}</span><br>
+        <span style="color: #DDFFDD;">정답: ${problem.correctAnswer}</span>
       </div>
       <div style="margin: 10px 0;">
         <strong>오답 원인:</strong> ${noteProblem.reason || '미입력'}
       </div>
-      ${noteProblem.drawing ? `<img src="${noteProblem.drawing}" style="max-width: 100%; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px;">` : ''}
+      ${noteProblem.drawing ? `<img src="${noteProblem.drawing}" style="max-width: 100%; border: 1px solid #E5DDFF; border-radius: 8px; margin-top: 10px;">` : ''}
     `;
     container.appendChild(noteDiv);
   });
