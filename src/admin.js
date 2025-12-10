@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, where, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, getDoc, query, where, doc, deleteDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig.js';
 import { isAdmin } from './adminConfig.js';
 
@@ -33,6 +33,7 @@ async function loadPdfJs() {
 
 let currentUser = null;
 let problemIdCounter = 1;
+let editingProblemId = null; // 현재 수정 중인 문제 ID
 
 // 인증 상태 확인
 onAuthStateChanged(auth, (user) => {
@@ -211,7 +212,7 @@ function parseProblemsFromText(text) {
   }
 }
 
-// 문제 추가
+// 문제 추가/수정
 document.getElementById('addProblemBtn')?.addEventListener('click', async () => {
   if (!currentUser) {
     alert('로그인이 필요합니다.');
@@ -272,33 +273,135 @@ document.getElementById('addProblemBtn')?.addEventListener('click', async () => 
   }
   
   try {
-    // Firestore에 저장
-    console.log('저장할 문제 데이터:', problemData);
-    await addDoc(collection(db, 'problems'), problemData);
-    
-    // 폼 초기화
-    document.getElementById('problemQuestion').value = '';
-    document.getElementById('problemAnswer').value = '';
-    document.getElementById('problemType').value = 'multiple'; // 기본값으로 리셋
-    for (let i = 0; i < 4; i++) {
-      document.getElementById(`option${i}`).value = '';
-      if (i === 0) {
-        document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = true;
-      } else {
-        document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = false;
-      }
+    if (editingProblemId) {
+      // 수정 모드: 기존 문제 업데이트
+      console.log('수정할 문제 데이터:', problemData);
+      await updateDoc(doc(db, 'problems', editingProblemId), problemData);
+      showStatus(`✅ 문제가 수정되었습니다!`, 'success');
+      editingProblemId = null;
+    } else {
+      // 추가 모드: 새 문제 추가
+      console.log('저장할 문제 데이터:', problemData);
+      await addDoc(collection(db, 'problems'), problemData);
+      showStatus(`✅ 문제가 Firestore에 저장되었습니다! 학생이 ${grade}학년 ${unit}단원을 선택하면 자동으로 로드됩니다.`, 'success');
     }
     
-    // UI 업데이트 (문제 유형 변경 이벤트 트리거)
-    document.getElementById('problemType').dispatchEvent(new Event('change'));
-    
-    showStatus(`✅ 문제가 Firestore에 저장되었습니다! 학생이 ${grade}학년 ${unit}단원을 선택하면 자동으로 로드됩니다.`, 'success');
+    // 폼 초기화
+    resetProblemForm();
     loadProblems();
   } catch (error) {
-    console.error('문제 추가 오류:', error);
-    showStatus('문제 추가에 실패했습니다: ' + error.message, 'error');
+    console.error('문제 저장 오류:', error);
+    showStatus('문제 저장에 실패했습니다: ' + error.message, 'error');
   }
 });
+
+// 폼 초기화 함수
+function resetProblemForm() {
+  document.getElementById('problemQuestion').value = '';
+  document.getElementById('problemAnswer').value = '';
+  document.getElementById('problemType').value = 'multiple'; // 기본값으로 리셋
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`option${i}`).value = '';
+    if (i === 0) {
+      document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = true;
+    } else {
+      document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = false;
+    }
+  }
+  
+  // UI 업데이트 (문제 유형 변경 이벤트 트리거)
+  document.getElementById('problemType').dispatchEvent(new Event('change'));
+  
+  // 버튼 텍스트 복원
+  const addBtn = document.getElementById('addProblemBtn');
+  if (addBtn) {
+    addBtn.textContent = '문제 추가';
+    addBtn.className = 'btn btn-success';
+  }
+  
+  editingProblemId = null;
+}
+
+// 문제 수정 함수
+window.editProblem = async function(problemId) {
+  try {
+    // Firestore에서 문제 데이터 가져오기
+    const problemRef = doc(db, 'problems', problemId);
+    const problemSnap = await getDoc(problemRef);
+    
+    if (problemSnap.exists()) {
+      const problem = { id: problemSnap.id, ...problemSnap.data() };
+      fillProblemForm(problem);
+    } else {
+      alert('문제를 찾을 수 없습니다.');
+    }
+  } catch (error) {
+    console.error('문제 로드 오류:', error);
+    alert('문제를 불러오는데 실패했습니다: ' + error.message);
+  }
+};
+
+// 폼에 문제 데이터 채우기
+function fillProblemForm(problem) {
+  editingProblemId = problem.id;
+  
+  // 기본 정보 채우기
+  document.getElementById('problemGrade').value = problem.grade;
+  document.getElementById('problemUnit').value = problem.unit;
+  document.getElementById('problemDifficulty').value = problem.difficulty;
+  document.getElementById('problemType').value = problem.type;
+  document.getElementById('problemQuestion').value = problem.question;
+  
+  // 문제 유형에 따라 필드 채우기
+  if (problem.type === 'multiple') {
+    // 보기 채우기
+    if (problem.options && problem.options.length > 0) {
+      for (let i = 0; i < 4; i++) {
+        const optionInput = document.getElementById(`option${i}`);
+        if (optionInput) {
+          optionInput.value = problem.options[i] || '';
+        }
+        // 정답 라디오 버튼 설정
+        const radioBtn = document.querySelector(`input[name="correctOption"][value="${i}"]`);
+        if (radioBtn) {
+          radioBtn.checked = (problem.correct === i);
+        }
+      }
+    }
+  } else if (problem.type === 'short') {
+    document.getElementById('problemAnswer').value = problem.answer || '';
+  }
+  
+  // UI 업데이트 (문제 유형 변경 이벤트 트리거)
+  document.getElementById('problemType').dispatchEvent(new Event('change'));
+  
+  // 버튼 텍스트 변경
+  const addBtn = document.getElementById('addProblemBtn');
+  if (addBtn) {
+    addBtn.textContent = '문제 수정 저장';
+    addBtn.className = 'btn btn-primary';
+  }
+  
+  // 수정 취소 버튼 추가 (이미 있으면 제거 후 다시 추가)
+  let cancelBtn = document.getElementById('cancelEditBtn');
+  if (cancelBtn) {
+    cancelBtn.remove();
+  }
+  cancelBtn = document.createElement('button');
+  cancelBtn.id = 'cancelEditBtn';
+  cancelBtn.className = 'btn btn-secondary';
+  cancelBtn.textContent = '수정 취소';
+  cancelBtn.onclick = () => {
+    resetProblemForm();
+    cancelBtn.remove();
+  };
+  addBtn.parentNode.insertBefore(cancelBtn, addBtn.nextSibling);
+  
+  // 스크롤을 폼으로 이동
+  document.querySelector('.card:nth-of-type(2)').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  
+  showStatus('문제 수정 모드입니다. 내용을 수정한 후 "문제 수정 저장" 버튼을 클릭하세요.', 'success');
+}
 
 // 문제 목록 로드
 async function loadProblems() {
@@ -345,10 +448,14 @@ async function loadProblems() {
         const difficultyStars = '⭐'.repeat(problem.difficulty);
         const typeLabel = problem.type === 'multiple' ? '객관식' : '주관식';
         
+        const difficultySprouts = '🌱'.repeat(problem.difficulty);
         let problemContent = `
           <div class="problem-header">
-            <strong>문제 ${index + 1} (${difficultyStars} ${typeLabel})</strong>
-            <button class="btn btn-danger" onclick="deleteProblem('${problem.id}')">삭제</button>
+            <strong>문제 ${index + 1} (${difficultySprouts} ${typeLabel})</strong>
+            <div>
+              <button class="btn btn-primary" onclick="editProblem('${problem.id}')" style="margin-right: 5px;">수정</button>
+              <button class="btn btn-danger" onclick="deleteProblem('${problem.id}')">삭제</button>
+            </div>
           </div>
           <div><strong>질문:</strong> ${problem.question}</div>
         `;
@@ -357,8 +464,10 @@ async function loadProblems() {
           problemContent += `<div style="margin-top: 10px;"><strong>보기:</strong> ${problem.options.map((opt, idx) => 
             `${idx + 1}. ${opt}${idx === problem.correct ? ' ✓' : ''}`
           ).join(', ')}</div>`;
-        } else {
+        } else if (problem.type === 'short') {
           problemContent += `<div style="margin-top: 10px;"><strong>정답:</strong> ${problem.answer}</div>`;
+        } else if (problem.type === 'drawing') {
+          problemContent += `<div style="margin-top: 10px;"><strong>유형:</strong> 서술형 (그리기)</div>`;
         }
         
         problemDiv.innerHTML = problemContent;
