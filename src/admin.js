@@ -48,13 +48,20 @@ document.getElementById('problemType')?.addEventListener('change', (e) => {
   const type = e.target.value;
   const optionsSection = document.getElementById('optionsSection');
   const answerSection = document.getElementById('answerSection');
+  const drawingSection = document.getElementById('drawingSection');
   
   if (type === 'multiple') {
     optionsSection.classList.remove('hidden');
     answerSection.classList.add('hidden');
-  } else {
+    drawingSection.classList.add('hidden');
+  } else if (type === 'short') {
     optionsSection.classList.add('hidden');
     answerSection.classList.remove('hidden');
+    drawingSection.classList.add('hidden');
+  } else if (type === 'drawing') {
+    optionsSection.classList.add('hidden');
+    answerSection.classList.add('hidden');
+    drawingSection.classList.remove('hidden');
   }
 });
 
@@ -245,13 +252,16 @@ document.getElementById('addProblemBtn')?.addEventListener('click', async () => 
     
     problemData.options = options;
     problemData.correct = correct;
-  } else {
+  } else if (type === 'short') {
     const answer = document.getElementById('problemAnswer').value.trim();
     if (!answer) {
       alert('정답을 입력해주세요.');
       return;
     }
     problemData.answer = answer;
+  } else if (type === 'drawing') {
+    // 서술형 문제는 정답이 필요 없음 (교사가 직접 채점)
+    // problemData에 추가 필드 없음
   }
   
   try {

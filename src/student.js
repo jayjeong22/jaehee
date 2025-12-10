@@ -173,6 +173,21 @@ function renderQuestions() {
         optionsDiv.appendChild(optionDiv);
       });
       questionDiv.appendChild(optionsDiv);
+    } else if (problem.type === 'drawing') {
+      // 서술형 문제 - 그림판
+      const drawingContainer = document.createElement('div');
+      drawingContainer.className = 'drawing-container';
+      drawingContainer.innerHTML = `
+        <div class="drawing-toolbar">
+          <button type="button" class="btn btn-secondary" onclick="clearDrawingCanvas('${problem.id}')">지우기</button>
+          <span class="drawing-hint">펜으로 답안을 그려주세요</span>
+        </div>
+        <canvas id="drawing-${problem.id}" class="drawing-canvas" width="800" height="400"></canvas>
+      `;
+      questionDiv.appendChild(drawingContainer);
+      
+      // 캔버스 초기화
+      initDrawingCanvas(problem.id);
     } else {
       const input = document.createElement('input');
       input.type = 'text';
@@ -188,8 +203,8 @@ function renderQuestions() {
       questionDiv.appendChild(input);
     }
     
-    // 즉시 확인 모드에서 정답 표시 영역
-    if (answerMode === 'immediate') {
+    // 즉시 확인 모드에서 정답 표시 영역 (서술형 제외)
+    if (answerMode === 'immediate' && problem.type !== 'drawing') {
       const answerDiv = document.createElement('div');
       answerDiv.className = 'answer-feedback';
       answerDiv.id = `feedback-${problem.id}`;
@@ -204,6 +219,11 @@ function renderQuestions() {
 
 // 즉시 정답 확인
 function checkAnswerImmediate(problem, userAnswer, element) {
+  // 서술형 문제는 즉시 확인 모드에서 처리하지 않음
+  if (problem.type === 'drawing') {
+    return;
+  }
+  
   let isCorrect = false;
   
   if (problem.type === 'multiple') {
@@ -258,14 +278,20 @@ function selectAnswer(problemId, answerIndex, element) {
 
 // 진행률 업데이트
 function updateProgress() {
-  const answered = Object.keys(userAnswers).length;
+  // null이나 빈 값 제외하고 카운트
+  const answered = Object.values(userAnswers).filter(answer => answer !== null && answer !== undefined && answer !== '').length;
   const total = currentProblems.length;
   document.getElementById('progressText').textContent = `진행: ${answered}/${total}`;
 }
 
 // 제출하기
 document.getElementById('submitQuizBtn')?.addEventListener('click', () => {
-  if (Object.keys(userAnswers).length < currentProblems.length) {
+  // 답한 문제 개수 확인 (null, undefined, 빈 문자열 제외)
+  const answeredCount = Object.values(userAnswers).filter(answer => 
+    answer !== null && answer !== undefined && answer !== ''
+  ).length;
+  
+  if (answeredCount < currentProblems.length) {
     if (!confirm('아직 답하지 않은 문제가 있습니다. 그래도 제출하시겠습니까?')) {
       return;
     }
@@ -279,6 +305,11 @@ function checkAnswers() {
   wrongProblems = [];
   
   currentProblems.forEach(problem => {
+    // 서술형 문제는 자동 채점하지 않음
+    if (problem.type === 'drawing') {
+      return;
+    }
+    
     const userAnswer = userAnswers[problem.id];
     let isCorrect = false;
     
@@ -302,12 +333,20 @@ function checkAnswers() {
 
 // 결과 화면 표시
 function showResult() {
-  const correct = currentProblems.length - wrongProblems.length;
-  const score = Math.round((correct / currentProblems.length) * 100);
+  // 서술형 문제 개수 계산
+  const drawingProblems = currentProblems.filter(p => p.type === 'drawing').length;
+  const autoGradedProblems = currentProblems.filter(p => p.type !== 'drawing');
+  
+  const correct = autoGradedProblems.length - wrongProblems.length;
+  const totalAutoGraded = autoGradedProblems.length;
+  const score = totalAutoGraded > 0 ? Math.round((correct / totalAutoGraded) * 100) : 0;
   
   document.getElementById('resultScore').textContent = `${score}점`;
-  document.getElementById('resultText').textContent = 
-    `맞은 문제: ${correct}개 / 전체: ${currentProblems.length}개`;
+  let resultText = `맞은 문제: ${correct}개 / 자동 채점: ${totalAutoGraded}개`;
+  if (drawingProblems > 0) {
+    resultText += ` (서술형 ${drawingProblems}개는 교사 채점 예정)`;
+  }
+  document.getElementById('resultText').textContent = resultText;
   
   const wrongContainer = document.getElementById('wrongProblemsContainer');
   wrongContainer.innerHTML = '';
@@ -339,6 +378,13 @@ async function saveResult() {
   if (!currentUser) return;
   
   try {
+    // 서술형 문제 개수 계산
+    const drawingProblems = currentProblems.filter(p => p.type === 'drawing').length;
+    const autoGradedProblems = currentProblems.filter(p => p.type !== 'drawing');
+    const correctCount = autoGradedProblems.length - wrongProblems.length;
+    const totalAutoGraded = autoGradedProblems.length;
+    const score = totalAutoGraded > 0 ? Math.round((correctCount / totalAutoGraded) * 100) : 0;
+    
     await addDoc(collection(db, 'results'), {
       userId: currentUser.uid,
       userName: currentUser.displayName || currentUser.email,
@@ -346,9 +392,11 @@ async function saveResult() {
       unit: currentUnit,
       difficulty: currentDifficulty,
       totalProblems: currentProblems.length,
-      correctCount: currentProblems.length - wrongProblems.length,
+      drawingProblems: drawingProblems,
+      autoGradedProblems: totalAutoGraded,
+      correctCount: correctCount,
       wrongCount: wrongProblems.length,
-      score: Math.round(((currentProblems.length - wrongProblems.length) / currentProblems.length) * 100),
+      score: score,
       timestamp: new Date(),
       answers: userAnswers,
       wrongProblems: wrongProblems.map(p => p.id)
@@ -432,7 +480,119 @@ function showNoteCreateScreen() {
   showScreen('noteCreateScreen');
 }
 
-// 캔버스 초기화
+// 서술형 문제용 그림판 캔버스 초기화
+const drawingCanvases = {};
+function initDrawingCanvas(problemId) {
+  const canvas = document.getElementById(`drawing-${problemId}`);
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  // 캔버스 배경을 흰색으로 설정
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+  
+  function getEventPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    if (e.touches) {
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY
+      };
+    } else {
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+  }
+  
+  function startDrawing(e) {
+    isDrawing = true;
+    const pos = getEventPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+  }
+  
+  function draw(e) {
+    if (!isDrawing) return;
+    
+    const pos = getEventPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    
+    lastX = pos.x;
+    lastY = pos.y;
+    
+    // 답안 자동 저장
+    saveDrawingAnswer(problemId);
+  }
+  
+  function stopDrawing() {
+    isDrawing = false;
+  }
+  
+  // 마우스 이벤트
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseleave', stopDrawing);
+  
+  // 터치 이벤트
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startDrawing(e);
+  });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    draw(e);
+  });
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    stopDrawing();
+  });
+  
+  drawingCanvases[problemId] = { canvas, ctx };
+}
+
+// 서술형 문제 답안 저장
+function saveDrawingAnswer(problemId) {
+  const canvas = document.getElementById(`drawing-${problemId}`);
+  if (!canvas) return;
+  
+  const imageData = canvas.toDataURL('image/png');
+  userAnswers[problemId] = imageData;
+  updateProgress();
+}
+
+// 서술형 문제 캔버스 지우기
+window.clearDrawingCanvas = function(problemId) {
+  const canvas = document.getElementById(`drawing-${problemId}`);
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 답안도 초기화
+  userAnswers[problemId] = null;
+  updateProgress();
+};
+
+// 캔버스 초기화 (오답노트용)
 const canvases = {};
 function initCanvas(problemId) {
   const canvas = document.getElementById(`canvas-${problemId}`);

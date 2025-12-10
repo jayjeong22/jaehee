@@ -229,6 +229,7 @@
         <select id="problemType">
           <option value="multiple">객관식</option>
           <option value="short">주관식</option>
+          <option value="drawing">서술형 (그리기)</option>
         </select>
       </div>
       <div class="form-group">
@@ -260,6 +261,9 @@
       <div id="answerSection" class="form-group hidden">
         <label>정답 (주관식인 경우)</label>
         <input type="text" id="problemAnswer" placeholder="정답을 입력하세요">
+      </div>
+      <div id="drawingSection" class="form-group hidden">
+        <p style="color: #8B8BAA; font-size: 14px;">서술형 문제는 학생이 그림판으로 답안을 그려서 제출합니다. 정답은 필요하지 않습니다.</p>
       </div>
       <button class="btn btn-success" id="addProblemBtn">문제 추가</button>
     </div>
