@@ -251,6 +251,19 @@ function renderWrongRateChart(results) {
   });
 }
 
+// 오답 원인을 한글로 변환
+function getReasonInKorean(reason) {
+  const reasonMap = {
+    'concept': '개념 부족',
+    'understanding': '문제 이해 못 함',
+    'calculation': '계산 실수',
+    'careless': '집중 부족'
+  };
+  
+  // 이미 한글이거나 매핑에 없는 경우 그대로 반환
+  return reasonMap[reason] || reason;
+}
+
 // 오답 유형 통계
 function renderReasonStats(userId) {
   const container = document.getElementById('reasonStats');
@@ -265,7 +278,8 @@ function renderReasonStats(userId) {
       note.problems.forEach(problem => {
         if (problem.reason) {
           const reason = problem.reason;
-          reasonCount.set(reason, (reasonCount.get(reason) || 0) + 1);
+          const koreanReason = getReasonInKorean(reason);
+          reasonCount.set(koreanReason, (reasonCount.get(koreanReason) || 0) + 1);
           total++;
         }
       });
@@ -305,21 +319,62 @@ function renderStudentNotes(userId) {
   studentNotes.forEach(note => {
     const noteDiv = document.createElement('div');
     noteDiv.className = 'note-item';
+    
+    // 각 문제별 오답노트 내용 생성
+    const problemsHtml = note.problems.map((p, idx) => {
+      const reasonText = p.reason ? getReasonInKorean(p.reason) : '원인 미입력';
+      
+      let noteContentHtml = '';
+      
+      // 오답노트 내용 표시 (텍스트 또는 그리기)
+      if (p.mode === 'text' && p.content) {
+        // 직접 쓰기 모드
+        noteContentHtml = `
+          <div style="margin-top: 10px; padding: 12px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">오답노트 (직접 쓰기):</div>
+            <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #333;">${p.content}</div>
+          </div>
+        `;
+      } else if (p.mode === 'drawing' && p.drawing) {
+        // 그리기 모드
+        noteContentHtml = `
+          <div style="margin-top: 10px;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">오답노트 (그리기):</div>
+            <img src="${p.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; display: block;">
+          </div>
+        `;
+      } else if (p.drawing) {
+        // 기존 데이터 호환성 (mode가 없는 경우)
+        noteContentHtml = `
+          <div style="margin-top: 10px;">
+            <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">오답노트:</div>
+            <img src="${p.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; display: block;">
+          </div>
+        `;
+      }
+      
+      return `
+        <div style="margin: 10px 0; padding: 15px; background: #FFFFFF; border: 2px solid #E5DDFF; border-radius: 8px;">
+          <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">문제 ${idx + 1}</div>
+          <div style="margin-bottom: 8px;">
+            <span style="font-weight: bold;">오답 원인:</span> 
+            <span style="color: #C62828;">${reasonText}</span>
+          </div>
+          ${noteContentHtml}
+        </div>
+      `;
+    }).join('');
+    
     noteDiv.innerHTML = `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
         <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
         <span style="color: #8B8BAA; font-size: 14px;">
           ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
         </span>
       </div>
-      <p>틀린 문제 ${note.problems.length}개</p>
-      <div style="margin-top: 10px;">
-        ${note.problems.map((p, idx) => `
-          <div style="margin: 5px 0; padding: 8px; background: #FFFFFF; border-radius: 5px;">
-            문제 ${idx + 1}: ${p.reason || '원인 미입력'}
-            ${p.drawing ? '<span style="color: #DDFFDD;">(손글씨 포함)</span>' : ''}
-          </div>
-        `).join('')}
+      <p style="margin-bottom: 10px;">틀린 문제 ${note.problems.length}개</p>
+      <div style="margin-top: 15px;">
+        ${problemsHtml}
       </div>
     `;
     container.appendChild(noteDiv);

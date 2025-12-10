@@ -524,10 +524,47 @@ function showNoteCreateScreen() {
       `;
     }
     
+    // 객관식 보기 표시 (있는 경우)
+    let optionsHtml = '';
+    if (problem.type === 'multiple' && problem.options && problem.options.length > 0) {
+      optionsHtml = `
+        <div style="margin: 15px 0; padding: 15px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
+          <div style="font-weight: bold; margin-bottom: 10px; color: #6B6B8A;">보기:</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${problem.options.map((option, optIndex) => {
+              const isCorrect = optIndex === problem.correct;
+              const isUserAnswer = typeof problem.userAnswer === 'number' && optIndex === problem.userAnswer;
+              let optionStyle = 'padding: 10px; border-radius: 6px; background: #FFFFFF; border: 2px solid #E5DDFF;';
+              
+              if (isCorrect && isUserAnswer) {
+                // 정답이면서 내가 선택한 답
+                optionStyle = 'padding: 10px; border-radius: 6px; background: #DDFFDD; border: 2px solid #4CAF50; font-weight: bold;';
+              } else if (isCorrect) {
+                // 정답 (내가 선택하지 않음)
+                optionStyle = 'padding: 10px; border-radius: 6px; background: #E8F5E9; border: 2px solid #4CAF50;';
+              } else if (isUserAnswer) {
+                // 내가 선택한 오답
+                optionStyle = 'padding: 10px; border-radius: 6px; background: #FFF5F5; border: 2px solid #E57373; font-weight: bold;';
+              }
+              
+              return `
+                <div style="${optionStyle}">
+                  ${optIndex + 1}. ${option}
+                  ${isCorrect ? ' <span style="color: #4CAF50;">✓ 정답</span>' : ''}
+                  ${isUserAnswer && !isCorrect ? ' <span style="color: #C62828;">(내가 선택한 답)</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+    
     noteDiv.innerHTML = `
       <div class="question-number">틀린 문제 ${index + 1}</div>
       ${imageHtml}
       <div class="question-text">${problem.question}</div>
+      ${optionsHtml}
       <div style="margin: 10px 0; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
         <span style="color: #C62828; font-weight: bold;">내 답: ${problem.type === 'multiple' && typeof problem.userAnswer === 'number' ? (problem.options[problem.userAnswer] || `보기 ${problem.userAnswer + 1}`) : problem.userAnswer}</span>
       </div>
@@ -1209,6 +1246,42 @@ function showNoteDetail(noteId, note) {
       `;
     }
     
+    // 객관식 보기 표시 (있는 경우)
+    let optionsHtml = '';
+    if (problem.type === 'multiple' && problem.options && problem.options.length > 0) {
+      optionsHtml = `
+        <div style="margin: 15px 0; padding: 15px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
+          <div style="font-weight: bold; margin-bottom: 10px; color: #6B6B8A;">보기:</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            ${problem.options.map((option, optIndex) => {
+              const isCorrect = optIndex === problem.correct;
+              const isUserAnswer = typeof problem.userAnswer === 'number' && optIndex === problem.userAnswer;
+              let optionStyle = 'padding: 10px; border-radius: 6px; background: #FFFFFF; border: 2px solid #E5DDFF;';
+              
+              if (isCorrect && isUserAnswer) {
+                // 정답이면서 내가 선택한 답
+                optionStyle = 'padding: 10px; border-radius: 6px; background: #DDFFDD; border: 2px solid #4CAF50; font-weight: bold;';
+              } else if (isCorrect) {
+                // 정답 (내가 선택하지 않음)
+                optionStyle = 'padding: 10px; border-radius: 6px; background: #E8F5E9; border: 2px solid #4CAF50;';
+              } else if (isUserAnswer) {
+                // 내가 선택한 오답
+                optionStyle = 'padding: 10px; border-radius: 6px; background: #FFF5F5; border: 2px solid #E57373; font-weight: bold;';
+              }
+              
+              return `
+                <div style="${optionStyle}">
+                  ${optIndex + 1}. ${option}
+                  ${isCorrect ? ' <span style="color: #4CAF50;">✓ 정답</span>' : ''}
+                  ${isUserAnswer && !isCorrect ? ' <span style="color: #C62828;">(내가 선택한 답)</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+    
     // 사용자 답안 텍스트 변환
     let userAnswerText = problem.userAnswer;
     if (problem.type === 'multiple' && typeof problem.userAnswer === 'number') {
@@ -1249,6 +1322,7 @@ function showNoteDetail(noteId, note) {
       <div class="question-number">문제 ${index + 1}</div>
       ${imageHtml}
       <div class="question-text">${problem.question}</div>
+      ${optionsHtml}
       <div style="margin: 10px 0;">
         <div style="margin-top: 10px; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
           <span style="color: #C62828; font-weight: bold;">내 답: ${userAnswerText}</span>
