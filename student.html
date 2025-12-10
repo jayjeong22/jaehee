@@ -12,7 +12,7 @@
       box-sizing: border-box;
     }
     body {
-      font-family: 'Malgun Gothic', sans-serif;
+      font-family: 'HakgyoansimDunggeunmiso', 'Malgun Gothic', sans-serif;
       background: #F5F5FF;
       min-height: 100vh;
     }
@@ -79,14 +79,15 @@
       margin-bottom: 8px;
       font-weight: bold;
       color: #6B6B8A;
+      font-size: 20px;
     }
     .select-group select {
       width: 100%;
-      padding: 12px;
+      padding: 16px;
       border: 2px solid #E5DDFF;
       background: #FFFFFF;
       border-radius: 8px;
-      font-size: 16px;
+      font-size: 20px;
       color: #6B6B8A;
     }
     .difficulty-selector {
@@ -262,11 +263,17 @@
       background: #E5DDFF;
       border-radius: 10px;
     }
+    .answer-mode-selector h3 {
+      font-size: 20px;
+      margin-bottom: 15px;
+      color: #6B6B8A;
+    }
     .answer-mode-selector label {
       display: flex;
       align-items: center;
       margin: 10px 0;
       cursor: pointer;
+      font-size: 20px;
     }
     .answer-mode-selector input[type="radio"] {
       margin-right: 10px;
@@ -344,7 +351,7 @@
           <h3>정답 확인 방식</h3>
           <label>
             <input type="radio" name="answerMode" value="immediate" checked>
-            즉시 정답 확인
+            즉시 정답 여부 확인
           </label>
           <label>
             <input type="radio" name="answerMode" value="after">

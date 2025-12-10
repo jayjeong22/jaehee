@@ -1,5 +1,14 @@
+/* 커스텀 폰트 정의 */
+@font-face {
+  font-family: 'HakgyoansimDunggeunmiso';
+  src: url('/Hakgyoansim Dunggeunmiso TTF R.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  font-family: 'Malgun Gothic', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'HakgyoansimDunggeunmiso', 'Malgun Gothic', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light;

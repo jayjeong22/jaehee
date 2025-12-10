@@ -1,17 +1,25 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig.js';
 import { problems } from './data/problems.js';
+import { isAdmin } from './adminConfig.js';
 
 let currentUser = null;
 let allResults = [];
 let allNotes = [];
 let selectedStudent = null;
 let wrongRateChart = null;
+let problemTypeMap = {}; // 문제 ID -> 문제 유형 매핑
 
 // 인증 상태 확인
 onAuthStateChanged(auth, (user) => {
   if (user) {
+    // 관리자 권한 확인
+    if (!isAdmin(user)) {
+      alert('관리자만 접근할 수 있습니다.');
+      window.location.href = '/';
+      return;
+    }
     currentUser = user;
     loadAllData();
   } else {
@@ -30,6 +38,15 @@ function showScreen(screenId) {
 // 모든 데이터 로드
 async function loadAllData() {
   try {
+    // 문제 데이터 로드 (문제 유형 매핑용)
+    const problemsQuery = query(collection(db, 'problems'));
+    const problemsSnapshot = await getDocs(problemsQuery);
+    problemTypeMap = {};
+    problemsSnapshot.forEach((doc) => {
+      const problem = { id: doc.id, ...doc.data() };
+      problemTypeMap[problem.id] = problem.type || 'unknown';
+    });
+
     // 결과 데이터 로드
     const resultsQuery = query(collection(db, 'results'), orderBy('timestamp', 'desc'));
     const resultsSnapshot = await getDocs(resultsQuery);
@@ -159,39 +176,58 @@ function showStudentDetail(userId, studentData) {
 function renderWrongRateChart(results) {
   const ctx = document.getElementById('wrongRateChart');
   
-  // 문제별 오답 횟수 집계
-  const problemWrongCount = new Map();
-  const problemTotalCount = new Map();
+  // 문제 유형별 오답 횟수 집계
+  const typeWrongCount = new Map();
 
   results.forEach(result => {
     if (result.wrongProblems && Array.isArray(result.wrongProblems)) {
       result.wrongProblems.forEach(problemId => {
-        problemWrongCount.set(problemId, (problemWrongCount.get(problemId) || 0) + 1);
+        // 문제 유형 확인
+        const problemType = problemTypeMap[problemId] || 'unknown';
+        let typeLabel = '알 수 없음';
+        
+        if (problemType === 'multiple') {
+          typeLabel = '객관식';
+        } else if (problemType === 'short') {
+          typeLabel = '주관식';
+        } else if (problemType === 'drawing') {
+          typeLabel = '서술형';
+        }
+        
+        typeWrongCount.set(typeLabel, (typeWrongCount.get(typeLabel) || 0) + 1);
       });
     }
-    
-    // 전체 문제 수 집계
-    const key = `${result.grade}-${result.unit}-${result.difficulty}`;
-    problemTotalCount.set(key, (problemTotalCount.get(key) || 0) + result.totalProblems);
   });
 
-  const problemIds = Array.from(problemWrongCount.keys());
-  const wrongCounts = problemIds.map(id => problemWrongCount.get(id));
-  const labels = problemIds.map(id => `문제 ${id}`);
+  const types = Array.from(typeWrongCount.keys());
+  const wrongCounts = types.map(type => typeWrongCount.get(type));
 
   if (wrongRateChart) {
     wrongRateChart.destroy();
   }
 
+  if (types.length === 0) {
+    ctx.parentElement.innerHTML = '<p>오답 데이터가 없습니다.</p>';
+    return;
+  }
+
   wrongRateChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: labels,
+      labels: types,
       datasets: [{
         label: '오답 횟수',
         data: wrongCounts,
-        backgroundColor: 'rgba(255, 221, 221, 0.5)',
-        borderColor: 'rgba(255, 221, 221, 0.8)',
+        backgroundColor: [
+          'rgba(255, 221, 221, 0.5)',
+          'rgba(221, 255, 221, 0.5)',
+          'rgba(221, 221, 255, 0.5)'
+        ],
+        borderColor: [
+          'rgba(255, 221, 221, 0.8)',
+          'rgba(221, 255, 221, 0.8)',
+          'rgba(221, 221, 255, 0.8)'
+        ],
         borderWidth: 1
       }]
     },
@@ -306,6 +342,7 @@ function renderResultsTable(results) {
           <th>정답</th>
           <th>오답</th>
           <th>점수</th>
+          <th>삭제</th>
         </tr>
       </thead>
       <tbody>
@@ -323,6 +360,9 @@ function renderResultsTable(results) {
         <td>${result.correctCount}</td>
         <td>${result.wrongCount}</td>
         <td>${result.score}점</td>
+        <td>
+          <button class="btn btn-danger" onclick="deleteResult('${result.id}')" style="padding: 5px 10px; font-size: 12px;">삭제</button>
+        </td>
       </tr>
     `;
   });
@@ -333,6 +373,45 @@ function renderResultsTable(results) {
   `;
 
   container.innerHTML = tableHTML;
+}
+
+// 결과 삭제 함수
+window.deleteResult = async function(resultId) {
+  if (!confirm('이 결과를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+    return;
+  }
+
+  try {
+    await deleteDoc(doc(db, 'results', resultId));
+    
+    // 데이터 다시 로드
+    await loadAllData();
+    
+    // 현재 선택된 학생이 있으면 상세 화면 다시 렌더링
+    if (selectedStudent) {
+      const studentData = {
+        userName: selectedStudent.userName,
+        results: allResults.filter(r => r.userId === selectedStudent.userId),
+        totalScore: 0,
+        totalTests: 0,
+        totalWrong: 0
+      };
+      
+      // 통계 재계산
+      studentData.results.forEach(result => {
+        studentData.totalScore += result.score;
+        studentData.totalTests++;
+        studentData.totalWrong += result.wrongCount || 0;
+      });
+      
+      showStudentDetail(selectedStudent.userId, studentData);
+    }
+    
+    alert('결과가 삭제되었습니다.');
+  } catch (error) {
+    console.error('결과 삭제 오류:', error);
+    alert('결과 삭제에 실패했습니다: ' + error.message);
+  }
 }
 
 // CSV 내보내기

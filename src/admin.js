@@ -1,6 +1,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, getDocs, query, where, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig.js';
+import { isAdmin } from './adminConfig.js';
 
 // PDF.js 동적 로드
 let pdfjsLib = null;
@@ -36,6 +37,12 @@ let problemIdCounter = 1;
 // 인증 상태 확인
 onAuthStateChanged(auth, (user) => {
   if (user) {
+    // 관리자 권한 확인
+    if (!isAdmin(user)) {
+      alert('관리자만 접근할 수 있습니다.');
+      window.location.href = '/';
+      return;
+    }
     currentUser = user;
     loadProblems();
   } else {

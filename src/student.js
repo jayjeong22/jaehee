@@ -115,14 +115,16 @@ function startQuiz() {
   }
   
   if (!gradeProblems || !gradeProblems[currentUnit]) {
-    alert('해당 학년/단원의 문제가 없습니다.');
+    alert('아직 문제가 업로드되지 않았습니다. 다른 항목을 선택해주세요.');
+    showScreen('unitSelectScreen');
     return;
   }
   
   currentProblems = gradeProblems[currentUnit][difficultyKey] || [];
   
   if (currentProblems.length === 0) {
-    alert('해당 난이도의 문제가 없습니다.');
+    alert('아직 문제가 업로드되지 않았습니다. 다른 항목을 선택해주세요.');
+    showScreen('unitSelectScreen');
     return;
   }
   
@@ -180,7 +182,8 @@ function renderQuestions() {
       drawingContainer.className = 'drawing-container';
       drawingContainer.innerHTML = `
         <div class="drawing-toolbar">
-          <button type="button" class="btn btn-secondary" onclick="clearDrawingCanvas('${problem.id}')">지우기</button>
+          <button type="button" class="btn btn-secondary" onclick="undoDrawing('${problem.id}')">돌아가기</button>
+          <button type="button" class="btn btn-secondary" onclick="clearDrawingCanvas('${problem.id}')">전체 지우기</button>
         </div>
         <canvas id="drawing-${problem.id}" class="drawing-canvas" width="800" height="400"></canvas>
       `;
@@ -234,17 +237,18 @@ function checkAnswerImmediate(problem, userAnswer, element) {
     isCorrect = parseInt(userAnswer) === problem.correct;
     userAnswers[problem.id] = parseInt(userAnswer);
     
-    // 옵션 스타일 업데이트
+    // 옵션 스타일 업데이트 (정답 표시하지 않음)
     const options = element.parentElement.querySelectorAll('.option');
     options.forEach((opt, idx) => {
       opt.classList.remove('selected', 'correct', 'incorrect');
       if (idx === parseInt(userAnswer)) {
         opt.classList.add('selected');
-      }
-      if (idx === problem.correct) {
-        opt.classList.add('correct');
-      } else if (idx === parseInt(userAnswer) && !isCorrect) {
-        opt.classList.add('incorrect');
+        // 정답 여부에 따라 스타일만 적용 (정답은 표시하지 않음)
+        if (isCorrect) {
+          opt.classList.add('correct');
+        } else {
+          opt.classList.add('incorrect');
+        }
       }
     });
   } else {
@@ -264,7 +268,7 @@ function checkAnswerImmediate(problem, userAnswer, element) {
   if (feedbackDiv) {
     feedbackDiv.innerHTML = isCorrect 
       ? '<span style="color: #DDFFDD;">✓ 정답입니다!</span>'
-      : `<span style="color: #FFDDDD;">✗ 오답입니다. 정답: ${problem.type === 'multiple' ? problem.options[problem.correct] : problem.answer}</span>`;
+      : '<span style="color: #FFDDDD;">✗ 오답입니다.</span>';
   }
   
   updateProgress();
@@ -369,11 +373,19 @@ function showResult() {
     wrongProblems.forEach((problem, index) => {
       const wrongDiv = document.createElement('div');
       wrongDiv.className = 'wrong-problem-item';
+      
+      // 객관식 문제의 경우 선택한 보기 번호를 텍스트로 변환
+      let userAnswerText = problem.userAnswer;
+      if (problem.type === 'multiple' && typeof problem.userAnswer === 'number') {
+        userAnswerText = problem.options[problem.userAnswer] || `보기 ${problem.userAnswer + 1}`;
+      }
+      
       wrongDiv.innerHTML = `
         <strong>문제 ${currentProblems.findIndex(p => p.id === problem.id) + 1}</strong><br>
         ${problem.question}<br>
-        <span style="color: #FFDDDD;">내 답: ${problem.userAnswer}</span><br>
-        <span style="color: #DDFFDD;">정답: ${problem.correctAnswer}</span>
+        <div style="margin-top: 10px; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
+          <span style="color: #C62828; font-weight: bold;">내 답: ${userAnswerText}</span>
+        </div>
       `;
       wrongContainer.appendChild(wrongDiv);
     });
@@ -457,17 +469,16 @@ function showNoteCreateScreen() {
     noteDiv.innerHTML = `
       <div class="question-number">틀린 문제 ${index + 1}</div>
       <div class="question-text">${problem.question}</div>
-      <div style="margin: 10px 0;">
-        <span style="color: #FFDDDD;">내 답: ${problem.userAnswer}</span><br>
-        <span style="color: #DDFFDD;">정답: ${problem.correctAnswer}</span>
+      <div style="margin: 10px 0; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
+        <span style="color: #C62828; font-weight: bold;">내 답: ${problem.type === 'multiple' && typeof problem.userAnswer === 'number' ? (problem.options[problem.userAnswer] || `보기 ${problem.userAnswer + 1}`) : problem.userAnswer}</span>
       </div>
       <div class="reason-selector">
         <label>오답 원인 선택:</label>
         <div>
-          <span class="reason-option" data-reason="concept">개념을 몰랐다</span>
-          <span class="reason-option" data-reason="calculation">계산 실수했다</span>
-          <span class="reason-option" data-reason="type">모르는 문제 유형이다</span>
-          <span class="reason-option" data-reason="careless">부주의했다</span>
+          <span class="reason-option" data-reason="concept">개념 부족</span>
+          <span class="reason-option" data-reason="understanding">문제 이해 못 함</span>
+          <span class="reason-option" data-reason="calculation">계산 실수</span>
+          <span class="reason-option" data-reason="careless">집중 부족</span>
         </div>
         <input type="text" class="custom-reason-input" placeholder="또는 직접 입력" id="custom-reason-${problem.id}">
       </div>
@@ -527,10 +538,10 @@ function initDrawingCanvas(problemId) {
     return;
   }
   
-  // 펜 설정: 10px 두께의 검은색 펜
+  // 펜 설정: 5px 두께의 검은색 펜
   ctx.strokeStyle = '#000000';
   ctx.fillStyle = '#000000';
-  ctx.lineWidth = 10;
+  ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   
@@ -578,7 +589,7 @@ function initDrawingCanvas(problemId) {
     
     // 첫 점도 그리기
     ctx.beginPath();
-    ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+    ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
     ctx.fill();
     
     // 즉시 저장
@@ -601,6 +612,12 @@ function initDrawingCanvas(problemId) {
     lastY = pos.y;
   }
   
+  // 각 획이 끝날 때마다 캔버스 상태를 저장하는 히스토리 배열
+  const drawingHistory = [];
+  
+  // 초기 상태 저장 (빈 캔버스)
+  drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  
   function stopDrawing(e) {
     if (e) {
       e.preventDefault();
@@ -609,6 +626,8 @@ function initDrawingCanvas(problemId) {
     
     if (isDrawing) {
       isDrawing = false;
+      // 현재 캔버스 상태를 히스토리에 저장
+      drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
       // 마지막 저장
       saveDrawingAnswer(problemId);
     }
@@ -654,7 +673,8 @@ function initDrawingCanvas(problemId) {
   drawingCanvases[problemId] = { 
     canvas: canvas, 
     ctx: ctx,
-    isDrawing: false
+    isDrawing: false,
+    history: drawingHistory
   };
   
   console.log(`Drawing canvas initialized for problem ${problemId}`);
@@ -678,6 +698,31 @@ function saveDrawingAnswer(problemId) {
   }
 }
 
+// 서술형 문제 한 획 되돌리기
+window.undoDrawing = function(problemId) {
+  const canvasData = drawingCanvases[problemId];
+  if (!canvasData || !canvasData.canvas || !canvasData.ctx || !canvasData.history) {
+    return;
+  }
+  
+  const history = canvasData.history;
+  
+  // 히스토리에 최소 2개 이상 있어야 되돌릴 수 있음 (초기 상태 + 최소 1개 획)
+  if (history.length <= 1) {
+    return; // 되돌릴 획이 없음
+  }
+  
+  // 마지막 획 제거
+  history.pop();
+  
+  // 이전 상태로 복원
+  const previousState = history[history.length - 1];
+  canvasData.ctx.putImageData(previousState, 0, 0);
+  
+  // 답안 업데이트
+  saveDrawingAnswer(problemId);
+}
+
 // 서술형 문제 캔버스 지우기
 window.clearDrawingCanvas = function(problemId) {
   const canvasData = drawingCanvases[problemId];
@@ -685,6 +730,12 @@ window.clearDrawingCanvas = function(problemId) {
     const ctx = canvasData.ctx;
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvasData.canvas.width, canvasData.canvas.height);
+    
+    // 히스토리 초기화 (초기 상태만 남김)
+    if (canvasData.history) {
+      canvasData.history = [];
+      canvasData.history.push(ctx.getImageData(0, 0, canvasData.canvas.width, canvasData.canvas.height));
+    }
     
     // 답안도 초기화
     userAnswers[problemId] = null;
@@ -884,8 +935,9 @@ function showNoteDetail(noteId, note) {
       <div class="question-number">문제 ${index + 1}</div>
       <div class="question-text">${problem.question}</div>
       <div style="margin: 10px 0;">
-        <span style="color: #FFDDDD;">내 답: ${problem.userAnswer}</span><br>
-        <span style="color: #DDFFDD;">정답: ${problem.correctAnswer}</span>
+        <div style="margin-top: 10px; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
+          <span style="color: #C62828; font-weight: bold;">내 답: ${problem.userAnswer}</span>
+        </div>
       </div>
       <div style="margin: 10px 0;">
         <strong>오답 원인:</strong> ${noteProblem.reason || '미입력'}

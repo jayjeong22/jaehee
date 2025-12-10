@@ -1,5 +1,6 @@
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, googleProvider } from './firebaseConfig.js';
+import { isAdmin, ADMIN_UIDS } from './adminConfig.js';
 
 let currentRole = null;
 
@@ -13,6 +14,34 @@ onAuthStateChanged(auth, (user) => {
     userSection.classList.remove('hidden');
     document.getElementById('userName').textContent = `이름: ${user.displayName || '사용자'}`;
     document.getElementById('userEmail').textContent = `이메일: ${user.email}`;
+    
+    // 관리자 버튼 표시 제어 (약간의 지연을 두어 DOM이 완전히 렌더링된 후 실행)
+    setTimeout(() => {
+      const goTeacherBtn = document.getElementById('goTeacherBtn');
+      const goAdminBtn = document.getElementById('goAdminBtn');
+      
+      // 디버깅 로그
+      console.log('=== 관리자 권한 확인 ===');
+      console.log('현재 사용자 UID:', user.uid);
+      console.log('관리자 UID 목록:', ADMIN_UIDS);
+      
+      const adminStatus = isAdmin(user);
+      console.log('관리자 여부:', adminStatus);
+      
+      if (goTeacherBtn) {
+        goTeacherBtn.style.display = adminStatus ? 'block' : 'none';
+        console.log('교사 화면 버튼:', adminStatus ? '표시' : '숨김');
+      } else {
+        console.error('goTeacherBtn을 찾을 수 없습니다.');
+      }
+      
+      if (goAdminBtn) {
+        goAdminBtn.style.display = adminStatus ? 'block' : 'none';
+        console.log('관리자 페이지 버튼:', adminStatus ? '표시' : '숨김');
+      } else {
+        console.error('goAdminBtn을 찾을 수 없습니다.');
+      }
+    }, 100);
   } else {
     loginSection.classList.remove('hidden');
     userSection.classList.add('hidden');
@@ -79,11 +108,19 @@ document.getElementById('goStudentBtn')?.addEventListener('click', () => {
 });
 
 document.getElementById('goTeacherBtn')?.addEventListener('click', () => {
-  window.location.href = '/teacherMonitor.html';
+  if (auth.currentUser && isAdmin(auth.currentUser)) {
+    window.location.href = '/teacherMonitor.html';
+  } else {
+    alert('관리자만 접근할 수 있습니다.');
+  }
 });
 
 document.getElementById('goAdminBtn')?.addEventListener('click', () => {
-  window.location.href = '/admin.html';
+  if (auth.currentUser && isAdmin(auth.currentUser)) {
+    window.location.href = '/admin.html';
+  } else {
+    alert('관리자만 접근할 수 있습니다.');
+  }
 });
 
 function checkAuthAndRedirect(role) {
