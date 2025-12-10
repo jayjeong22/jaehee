@@ -492,6 +492,9 @@ document.getElementById('createNoteBtn')?.addEventListener('click', () => {
   showNoteCreateScreen();
 });
 
+// 오답노트 모드 상태 관리 (각 문제별로 'text' 또는 'drawing')
+const noteModes = {};
+
 function showNoteCreateScreen() {
   const container = document.getElementById('noteProblemsContainer');
   container.innerHTML = '';
@@ -505,10 +508,25 @@ function showNoteCreateScreen() {
   const autoGradedWrongProblems = wrongProblems.filter(p => p.type !== 'drawing');
   
   autoGradedWrongProblems.forEach((problem, index) => {
+    // 기본 모드는 직접 쓰기
+    noteModes[problem.id] = 'text';
+    
     const noteDiv = document.createElement('div');
     noteDiv.className = 'question-card';
+    
+    // 이미지 표시 (있는 경우)
+    let imageHtml = '';
+    if (problem.imageUrl) {
+      imageHtml = `
+        <div style="margin: 10px 0; text-align: center;">
+          <img src="${problem.imageUrl}" alt="문제 이미지" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display='none';">
+        </div>
+      `;
+    }
+    
     noteDiv.innerHTML = `
       <div class="question-number">틀린 문제 ${index + 1}</div>
+      ${imageHtml}
       <div class="question-text">${problem.question}</div>
       <div style="margin: 10px 0; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
         <span style="color: #C62828; font-weight: bold;">내 답: ${problem.type === 'multiple' && typeof problem.userAnswer === 'number' ? (problem.options[problem.userAnswer] || `보기 ${problem.userAnswer + 1}`) : problem.userAnswer}</span>
@@ -523,18 +541,51 @@ function showNoteCreateScreen() {
         </div>
         <input type="text" class="custom-reason-input" placeholder="또는 직접 입력" id="custom-reason-${problem.id}">
       </div>
-      <div class="canvas-container">
-        <div class="canvas-toolbar">
-          <button class="btn btn-secondary" onclick="clearCanvas(${problem.id})">지우기</button>
-          <button class="btn btn-secondary" onclick="saveCanvas(${problem.id})">저장</button>
+      <div style="margin-top: 20px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <button class="btn btn-primary note-mode-btn" data-mode="text" data-problem-id="${problem.id}" style="flex: 1;">
+            직접 쓰기
+          </button>
+          <button class="btn btn-secondary note-mode-btn" data-mode="drawing" data-problem-id="${problem.id}" style="flex: 1;">
+            그리기
+          </button>
         </div>
-        <canvas id="canvas-${problem.id}" width="800" height="400" style="width: 100%; height: auto;"></canvas>
+        <div id="note-content-${problem.id}">
+          <!-- 직접 쓰기 모드 -->
+          <textarea 
+            id="note-text-${problem.id}" 
+            class="note-text-input" 
+            placeholder="오답 노트를 입력하세요..."
+            rows="6"
+            style="width: 100%; padding: 12px; border: 2px solid #E5DDFF; border-radius: 8px; font-size: 16px; font-family: 'HakgyoansimDunggeunmiso', 'Malgun Gothic', sans-serif; resize: vertical;"
+          ></textarea>
+          <!-- 그리기 모드 (숨김) -->
+          <div id="note-drawing-${problem.id}" style="display: none;">
+            <div class="canvas-toolbar" style="display: flex; gap: 10px; margin-bottom: 10px;">
+              <button class="btn btn-secondary" onclick="clearNoteCanvas('${problem.id}')">전체 지우기</button>
+              <button class="btn btn-secondary" onclick="undoNoteDrawing('${problem.id}')">돌아가기</button>
+            </div>
+            <canvas id="note-canvas-${problem.id}" width="800" height="400" style="width: 100%; height: auto; border: 2px solid #E5DDFF; border-radius: 8px; touch-action: none; user-select: none;"></canvas>
+          </div>
+        </div>
       </div>
     `;
     container.appendChild(noteDiv);
     
-    // 캔버스 초기화
-    initCanvas(problem.id);
+    // 모드 전환 버튼 이벤트
+    noteDiv.querySelectorAll('.note-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        const problemId = problem.id;
+        switchNoteMode(problemId, mode, noteDiv);
+      });
+    });
+    
+    // 직접 쓰기 모드 초기화 (기본 모드)
+    const textInput = document.getElementById(`note-text-${problem.id}`);
+    textInput.addEventListener('input', (e) => {
+      updateNoteContent(problem.id, 'text', e.target.value);
+    });
     
     // 오답 원인 선택
     noteDiv.querySelectorAll('.reason-option').forEach(opt => {
@@ -557,6 +608,41 @@ function showNoteCreateScreen() {
   });
   
   showScreen('noteCreateScreen');
+}
+
+// 오답노트 모드 전환
+function switchNoteMode(problemId, mode, noteDiv) {
+  noteModes[problemId] = mode;
+  
+  const textBtn = noteDiv.querySelector(`.note-mode-btn[data-mode="text"]`);
+  const drawingBtn = noteDiv.querySelector(`.note-mode-btn[data-mode="drawing"]`);
+  const textArea = document.getElementById(`note-text-${problemId}`);
+  const drawingDiv = document.getElementById(`note-drawing-${problemId}`);
+  
+  if (mode === 'text') {
+    textBtn.classList.remove('btn-secondary');
+    textBtn.classList.add('btn-primary');
+    drawingBtn.classList.remove('btn-primary');
+    drawingBtn.classList.add('btn-secondary');
+    textArea.style.display = 'block';
+    drawingDiv.style.display = 'none';
+  } else {
+    textBtn.classList.remove('btn-primary');
+    textBtn.classList.add('btn-secondary');
+    drawingBtn.classList.remove('btn-secondary');
+    drawingBtn.classList.add('btn-primary');
+    textArea.style.display = 'none';
+    drawingDiv.style.display = 'block';
+    
+    // 그리기 모드로 전환 시 캔버스 초기화 (DOM 렌더링 후)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!noteCanvases[problemId]) {
+          initNoteCanvas(problemId);
+        }
+      });
+    });
+  }
 }
 
 // 서술형 문제용 그림판 캔버스 초기화
@@ -794,80 +880,179 @@ window.clearDrawingCanvas = function(problemId) {
   }
 };
 
-// 캔버스 초기화 (오답노트용)
-const canvases = {};
-function initCanvas(problemId) {
-  const canvas = document.getElementById(`canvas-${problemId}`);
+// 오답노트용 캔버스 초기화
+const noteCanvases = {};
+const noteDrawingHistory = {};
+
+function initNoteCanvas(problemId) {
+  const canvas = document.getElementById(`note-canvas-${problemId}`);
+  if (!canvas) {
+    console.error(`Canvas not found: note-canvas-${problemId}`);
+    return;
+  }
+  
+  // 이미 초기화된 경우 스킵
+  if (noteCanvases[problemId]) {
+    return;
+  }
+  
   const ctx = canvas.getContext('2d');
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
+  if (!ctx) {
+    console.error('Could not get 2d context');
+    return;
+  }
+  
+  // 펜 설정: 5px 두께의 검은색 펜
+  ctx.strokeStyle = '#000000';
+  ctx.fillStyle = '#000000';
+  ctx.lineWidth = 5;
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  // 캔버스 배경을 흰색으로 설정
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000'; // 다시 검은색으로
   
   let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
   
-  canvas.addEventListener('mousedown', (e) => {
-    isDrawing = true;
+  function getEventPos(e) {
     const rect = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-  });
-  
-  canvas.addEventListener('mousemove', (e) => {
-    if (isDrawing) {
-      const rect = canvas.getBoundingClientRect();
-      ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-      ctx.stroke();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
     }
-  });
+    
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  }
   
-  canvas.addEventListener('mouseup', () => {
-    isDrawing = false;
-  });
+  function startDrawing(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    isDrawing = true;
+    const pos = getEventPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    
+    // 첫 점도 그리기
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
   
-  canvas.addEventListener('mouseleave', () => {
-    isDrawing = false;
-  });
+  function draw(e) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const pos = getEventPos(e);
+    
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    
+    lastX = pos.x;
+    lastY = pos.y;
+  }
+  
+  // 각 획이 끝날 때마다 캔버스 상태를 저장하는 히스토리 배열
+  if (!noteDrawingHistory[problemId]) {
+    noteDrawingHistory[problemId] = [];
+    // 초기 상태 저장 (빈 캔버스)
+    noteDrawingHistory[problemId].push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  }
+  
+  function stopDrawing(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    if (isDrawing) {
+      isDrawing = false;
+      // 현재 캔버스 상태를 히스토리에 저장
+      noteDrawingHistory[problemId].push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      // 최대 50개까지만 저장 (메모리 관리)
+      if (noteDrawingHistory[problemId].length > 50) {
+        noteDrawingHistory[problemId].shift();
+      }
+      // 내용 저장
+      saveNoteContent(problemId);
+    }
+  }
+  
+  // 마우스 이벤트
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseleave', stopDrawing);
   
   // 터치 이벤트
-  canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    isDrawing = true;
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
-  });
+  canvas.addEventListener('touchstart', startDrawing, { passive: false });
+  canvas.addEventListener('touchmove', draw, { passive: false });
+  canvas.addEventListener('touchend', stopDrawing, { passive: false });
+  canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
   
-  canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (isDrawing) {
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
-      ctx.stroke();
-    }
-  });
+  // 포인터 이벤트 (터치 패드 지원)
+  canvas.addEventListener('pointerdown', startDrawing);
+  canvas.addEventListener('pointermove', draw);
+  canvas.addEventListener('pointerup', stopDrawing);
+  canvas.addEventListener('pointerleave', stopDrawing);
+  canvas.addEventListener('pointercancel', stopDrawing);
   
-  canvas.addEventListener('touchend', () => {
-    isDrawing = false;
-  });
-  
-  canvases[problemId] = { canvas, ctx };
+  noteCanvases[problemId] = { canvas, ctx };
 }
 
-// 캔버스 지우기
-window.clearCanvas = function(problemId) {
-  const { canvas, ctx } = canvases[problemId];
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+// 오답노트 캔버스 지우기
+window.clearNoteCanvas = function(problemId) {
+  const canvasData = noteCanvases[problemId];
+  if (!canvasData) return;
+  
+  const { canvas, ctx } = canvasData;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000';
+  
+  // 히스토리 초기화
+  noteDrawingHistory[problemId] = [];
+  noteDrawingHistory[problemId].push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  
+  saveNoteContent(problemId);
 };
 
-// 캔버스 저장
-window.saveCanvas = function(problemId) {
-  const { canvas } = canvases[problemId];
-  const imageData = canvas.toDataURL('image/png');
-  const noteItem = currentNoteData.problems.find(p => p.problemId === problemId);
-  if (noteItem) {
-    noteItem.drawing = imageData;
+// 오답노트 그리기 되돌리기
+window.undoNoteDrawing = function(problemId) {
+  const canvasData = noteCanvases[problemId];
+  if (!canvasData) return;
+  
+  const { canvas, ctx } = canvasData;
+  const history = noteDrawingHistory[problemId];
+  
+  if (history && history.length > 1) {
+    // 마지막 상태 제거
+    history.pop();
+    // 이전 상태로 복원
+    const previousState = history[history.length - 1];
+    ctx.putImageData(previousState, 0, 0);
+    saveNoteContent(problemId);
   }
 };
 
@@ -875,19 +1060,63 @@ window.saveCanvas = function(problemId) {
 function updateNoteReason(problemId, reason) {
   let noteItem = currentNoteData.problems.find(p => p.problemId === problemId);
   if (!noteItem) {
-    noteItem = { problemId, reason: '' };
+    noteItem = { problemId, reason: '', mode: 'text', content: '' };
     currentNoteData.problems.push(noteItem);
   }
   noteItem.reason = reason;
+}
+
+// 오답노트 내용 업데이트 (직접 쓰기 모드)
+function updateNoteContent(problemId, mode, content) {
+  let noteItem = currentNoteData.problems.find(p => p.problemId === problemId);
+  if (!noteItem) {
+    noteItem = { problemId, reason: '', mode: mode, content: '' };
+    currentNoteData.problems.push(noteItem);
+  }
+  noteItem.mode = mode;
+  if (mode === 'text') {
+    noteItem.content = content;
+    noteItem.drawing = null;
+  }
+}
+
+// 오답노트 그리기 내용 저장
+function saveNoteContent(problemId) {
+  const canvasData = noteCanvases[problemId];
+  if (!canvasData) return;
+  
+  const { canvas } = canvasData;
+  const imageData = canvas.toDataURL('image/png');
+  
+  let noteItem = currentNoteData.problems.find(p => p.problemId === problemId);
+  if (!noteItem) {
+    noteItem = { problemId, reason: '', mode: 'drawing', content: '' };
+    currentNoteData.problems.push(noteItem);
+  }
+  noteItem.mode = 'drawing';
+  noteItem.drawing = imageData;
+  noteItem.content = null;
 }
 
 // 오답노트 저장
 document.getElementById('saveNoteBtn')?.addEventListener('click', async () => {
   if (!currentUser) return;
   
-  // 모든 캔버스 저장
-  wrongProblems.forEach(problem => {
-    saveCanvas(problem.id);
+  // 모든 문제의 내용 저장
+  const autoGradedWrongProblems = wrongProblems.filter(p => p.type !== 'drawing');
+  autoGradedWrongProblems.forEach(problem => {
+    const mode = noteModes[problem.id] || 'text';
+    
+    if (mode === 'drawing') {
+      // 그리기 모드: 캔버스 이미지 저장
+      saveNoteContent(problem.id);
+    } else {
+      // 직접 쓰기 모드: 텍스트 저장
+      const textInput = document.getElementById(`note-text-${problem.id}`);
+      if (textInput) {
+        updateNoteContent(problem.id, 'text', textInput.value);
+      }
+    }
   });
   
   try {
@@ -970,20 +1199,65 @@ function showNoteDetail(noteId, note) {
                    currentProblems.find(p => p.id === noteProblem.problemId);
     if (!problem) return;
     
+    // 이미지 표시 (있는 경우)
+    let imageHtml = '';
+    if (problem.imageUrl) {
+      imageHtml = `
+        <div style="margin: 10px 0; text-align: center;">
+          <img src="${problem.imageUrl}" alt="문제 이미지" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display='none';">
+        </div>
+      `;
+    }
+    
+    // 사용자 답안 텍스트 변환
+    let userAnswerText = problem.userAnswer;
+    if (problem.type === 'multiple' && typeof problem.userAnswer === 'number') {
+      userAnswerText = problem.options[problem.userAnswer] || `보기 ${problem.userAnswer + 1}`;
+    }
+    
+    // 오답노트 내용 표시
+    let noteContentHtml = '';
+    if (noteProblem.mode === 'drawing' && noteProblem.drawing) {
+      noteContentHtml = `
+        <div style="margin-top: 15px;">
+          <strong>오답노트 (그리기):</strong>
+          <img src="${noteProblem.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin-top: 10px; display: block;">
+        </div>
+      `;
+    } else if (noteProblem.mode === 'text' && noteProblem.content) {
+      noteContentHtml = `
+        <div style="margin-top: 15px;">
+          <strong>오답노트 (직접 쓰기):</strong>
+          <div style="margin-top: 10px; padding: 12px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px; white-space: pre-wrap; font-size: 16px; line-height: 1.6;">
+            ${noteProblem.content}
+          </div>
+        </div>
+      `;
+    } else if (noteProblem.drawing) {
+      // 기존 데이터 호환성 (mode가 없는 경우)
+      noteContentHtml = `
+        <div style="margin-top: 15px;">
+          <strong>오답노트:</strong>
+          <img src="${noteProblem.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin-top: 10px; display: block;">
+        </div>
+      `;
+    }
+    
     const noteDiv = document.createElement('div');
     noteDiv.className = 'question-card';
     noteDiv.innerHTML = `
       <div class="question-number">문제 ${index + 1}</div>
+      ${imageHtml}
       <div class="question-text">${problem.question}</div>
       <div style="margin: 10px 0;">
         <div style="margin-top: 10px; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
-          <span style="color: #C62828; font-weight: bold;">내 답: ${problem.userAnswer}</span>
+          <span style="color: #C62828; font-weight: bold;">내 답: ${userAnswerText}</span>
         </div>
       </div>
       <div style="margin: 10px 0;">
         <strong>오답 원인:</strong> ${noteProblem.reason || '미입력'}
       </div>
-      ${noteProblem.drawing ? `<img src="${noteProblem.drawing}" style="max-width: 100%; border: 1px solid #E5DDFF; border-radius: 8px; margin-top: 10px;">` : ''}
+      ${noteContentHtml}
     `;
     container.appendChild(noteDiv);
   });
