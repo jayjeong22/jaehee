@@ -266,11 +266,13 @@ document.getElementById('addProblemBtn')?.addEventListener('click', async () => 
   
   try {
     // Firestore에 저장
+    console.log('저장할 문제 데이터:', problemData);
     await addDoc(collection(db, 'problems'), problemData);
     
     // 폼 초기화
     document.getElementById('problemQuestion').value = '';
     document.getElementById('problemAnswer').value = '';
+    document.getElementById('problemType').value = 'multiple'; // 기본값으로 리셋
     for (let i = 0; i < 4; i++) {
       document.getElementById(`option${i}`).value = '';
       if (i === 0) {
@@ -279,6 +281,9 @@ document.getElementById('addProblemBtn')?.addEventListener('click', async () => 
         document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = false;
       }
     }
+    
+    // UI 업데이트 (문제 유형 변경 이벤트 트리거)
+    document.getElementById('problemType').dispatchEvent(new Event('change'));
     
     showStatus(`✅ 문제가 Firestore에 저장되었습니다! 학생이 ${grade}학년 ${unit}단원을 선택하면 자동으로 로드됩니다.`, 'success');
     loadProblems();
