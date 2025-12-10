@@ -153,10 +153,39 @@ function renderQuestions() {
   currentProblems.forEach((problem, index) => {
     const questionDiv = document.createElement('div');
     questionDiv.className = 'question-card';
-    questionDiv.innerHTML = `
-      <div class="question-number">문제 ${index + 1}</div>
-      <div class="question-text">${problem.question}</div>
-    `;
+    
+    // 문제 번호
+    const questionNumber = document.createElement('div');
+    questionNumber.className = 'question-number';
+    questionNumber.textContent = `문제 ${index + 1}`;
+    questionDiv.appendChild(questionNumber);
+    
+    // 이미지 표시 (있는 경우)
+    if (problem.imageUrl) {
+      const imageDiv = document.createElement('div');
+      imageDiv.className = 'problem-image-container';
+      imageDiv.style.marginBottom = '20px';
+      imageDiv.style.textAlign = 'center';
+      const img = document.createElement('img');
+      img.src = problem.imageUrl;
+      img.alt = '문제 이미지';
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+      img.style.borderRadius = '8px';
+      img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+      img.onerror = function() {
+        this.style.display = 'none';
+        imageDiv.innerHTML = '<p style="color: #999;">이미지를 불러올 수 없습니다.</p>';
+      };
+      imageDiv.appendChild(img);
+      questionDiv.appendChild(imageDiv);
+    }
+    
+    // 문제 텍스트
+    const questionText = document.createElement('div');
+    questionText.className = 'question-text';
+    questionText.textContent = problem.question;
+    questionDiv.appendChild(questionText);
     
     if (problem.type === 'multiple') {
       const optionsDiv = document.createElement('div');
@@ -380,13 +409,25 @@ function showResult() {
         userAnswerText = problem.options[problem.userAnswer] || `보기 ${problem.userAnswer + 1}`;
       }
       
-      wrongDiv.innerHTML = `
-        <strong>문제 ${currentProblems.findIndex(p => p.id === problem.id) + 1}</strong><br>
+      let wrongDivContent = `<strong>문제 ${currentProblems.findIndex(p => p.id === problem.id) + 1}</strong><br>`;
+      
+      // 이미지 표시 (있는 경우)
+      if (problem.imageUrl) {
+        wrongDivContent += `
+          <div style="margin: 10px 0; text-align: center;">
+            <img src="${problem.imageUrl}" alt="문제 이미지" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" onerror="this.style.display='none';">
+          </div>
+        `;
+      }
+      
+      wrongDivContent += `
         ${problem.question}<br>
         <div style="margin-top: 10px; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
           <span style="color: #C62828; font-weight: bold;">내 답: ${userAnswerText}</span>
         </div>
       `;
+      
+      wrongDiv.innerHTML = wrongDivContent;
       wrongContainer.appendChild(wrongDiv);
     });
     

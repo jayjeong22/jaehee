@@ -3,6 +3,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // Firebase 프로젝트 설정 정보
 // 환경 변수에서 가져오거나, 없으면 기본값 사용
@@ -19,11 +20,13 @@ const firebaseConfig = {
 let app;
 let auth;
 let db;
+let storage;
 
 try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
   
   // 초기화 성공 확인
   console.log('Firebase 초기화 성공');
@@ -32,6 +35,6 @@ try {
   alert('Firebase 설정 오류가 발생했습니다. 콘솔을 확인하세요.');
 }
 
-export { auth, db };
+export { auth, db, storage };
 export const googleProvider = new GoogleAuthProvider();
 

@@ -1,6 +1,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, getDocs, getDoc, query, where, doc, deleteDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from './firebaseConfig.js';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { auth, db, storage } from './firebaseConfig.js';
 import { isAdmin } from './adminConfig.js';
 
 // PDF.js 동적 로드
@@ -49,6 +50,48 @@ onAuthStateChanged(auth, (user) => {
   } else {
     window.location.href = '/';
   }
+});
+
+// 이미지 미리보기
+let currentImageFile = null;
+let currentImageUrl = null; // 수정 모드에서 기존 이미지 URL
+
+document.getElementById('problemImage')?.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  const preview = document.getElementById('imagePreview');
+  const previewImg = document.getElementById('previewImg');
+  const removeBtn = document.getElementById('removeImageBtn');
+  
+  if (file) {
+    // 파일 타입 확인
+    if (!file.type.match('image/(png|jpeg|jpg)')) {
+      alert('PNG, JPEG, JPG 파일만 업로드 가능합니다.');
+      e.target.value = '';
+      return;
+    }
+    
+    currentImageFile = file;
+    currentImageUrl = null; // 새 이미지 업로드 시 기존 URL 초기화
+    
+    // 미리보기 표시
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewImg.src = e.target.result;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// 이미지 제거 버튼
+document.getElementById('removeImageBtn')?.addEventListener('click', () => {
+  const fileInput = document.getElementById('problemImage');
+  const preview = document.getElementById('imagePreview');
+  
+  fileInput.value = '';
+  currentImageFile = null;
+  currentImageUrl = null;
+  preview.style.display = 'none';
 });
 
 // 문제 유형 변경 시 UI 업데이트
@@ -212,6 +255,29 @@ function parseProblemsFromText(text) {
   }
 }
 
+// 이미지 업로드 함수
+async function uploadProblemImage(file, problemId = null) {
+  if (!file) return null;
+  
+  try {
+    // 파일명 생성 (타임스탬프 + 원본 파일명)
+    const timestamp = Date.now();
+    const fileName = problemId 
+      ? `problems/${problemId}_${timestamp}_${file.name}`
+      : `problems/${timestamp}_${file.name}`;
+    
+    const storageRef = ref(storage, fileName);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    console.log('이미지 업로드 성공:', downloadURL);
+    return downloadURL;
+  } catch (error) {
+    console.error('이미지 업로드 오류:', error);
+    throw error;
+  }
+}
+
 // 문제 추가/수정
 document.getElementById('addProblemBtn')?.addEventListener('click', async () => {
   if (!currentUser) {
@@ -273,6 +339,29 @@ document.getElementById('addProblemBtn')?.addEventListener('click', async () => 
   }
   
   try {
+    // 이미지 업로드 처리
+    if (currentImageFile) {
+      // 새 이미지 업로드
+      const addBtn = document.getElementById('addProblemBtn');
+      const originalText = addBtn.textContent;
+      addBtn.disabled = true;
+      addBtn.textContent = '이미지 업로드 중...';
+      
+      try {
+        const imageUrl = await uploadProblemImage(currentImageFile, editingProblemId);
+        problemData.imageUrl = imageUrl;
+      } catch (imageError) {
+        console.error('이미지 업로드 실패:', imageError);
+        alert('이미지 업로드에 실패했습니다. 문제는 저장되지만 이미지는 포함되지 않습니다.');
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = originalText;
+      }
+    } else if (currentImageUrl && !currentImageFile) {
+      // 수정 모드에서 기존 이미지 유지
+      problemData.imageUrl = currentImageUrl;
+    }
+    
     if (editingProblemId) {
       // 수정 모드: 기존 문제 업데이트
       console.log('수정할 문제 데이터:', problemData);
@@ -309,6 +398,14 @@ function resetProblemForm() {
     }
   }
   
+  // 이미지 초기화
+  const fileInput = document.getElementById('problemImage');
+  const preview = document.getElementById('imagePreview');
+  if (fileInput) fileInput.value = '';
+  if (preview) preview.style.display = 'none';
+  currentImageFile = null;
+  currentImageUrl = null;
+  
   // UI 업데이트 (문제 유형 변경 이벤트 트리거)
   document.getElementById('problemType').dispatchEvent(new Event('change'));
   
@@ -318,6 +415,10 @@ function resetProblemForm() {
     addBtn.textContent = '문제 추가';
     addBtn.className = 'btn btn-success';
   }
+  
+  // 수정 취소 버튼 제거
+  const cancelBtn = document.getElementById('cancelEditBtn');
+  if (cancelBtn) cancelBtn.remove();
   
   editingProblemId = null;
 }
@@ -351,6 +452,26 @@ function fillProblemForm(problem) {
   document.getElementById('problemDifficulty').value = problem.difficulty;
   document.getElementById('problemType').value = problem.type;
   document.getElementById('problemQuestion').value = problem.question;
+  
+  // 이미지 처리
+  const fileInput = document.getElementById('problemImage');
+  const preview = document.getElementById('imagePreview');
+  const previewImg = document.getElementById('previewImg');
+  
+  if (problem.imageUrl) {
+    // 기존 이미지가 있으면 미리보기 표시
+    currentImageUrl = problem.imageUrl;
+    currentImageFile = null; // 새 파일이 선택되지 않았으므로 null
+    previewImg.src = problem.imageUrl;
+    preview.style.display = 'block';
+    if (fileInput) fileInput.value = ''; // 파일 입력은 초기화
+  } else {
+    // 이미지가 없으면 미리보기 숨기기
+    currentImageUrl = null;
+    currentImageFile = null;
+    if (preview) preview.style.display = 'none';
+    if (fileInput) fileInput.value = '';
+  }
   
   // 문제 유형에 따라 필드 채우기
   if (problem.type === 'multiple') {
@@ -445,13 +566,13 @@ async function loadProblems() {
         const problemDiv = document.createElement('div');
         problemDiv.className = 'problem-item';
         
-        const difficultyStars = '⭐'.repeat(problem.difficulty);
-        const typeLabel = problem.type === 'multiple' ? '객관식' : '주관식';
+        const typeLabel = problem.type === 'multiple' ? '객관식' : problem.type === 'short' ? '주관식' : '서술형';
         
         const difficultySprouts = '🌱'.repeat(problem.difficulty);
+        const imageIndicator = problem.imageUrl ? ' 📷' : '';
         let problemContent = `
           <div class="problem-header">
-            <strong>문제 ${index + 1} (${difficultySprouts} ${typeLabel})</strong>
+            <strong>문제 ${index + 1} (${difficultySprouts} ${typeLabel})${imageIndicator}</strong>
             <div>
               <button class="btn btn-primary" onclick="editProblem('${problem.id}')" style="margin-right: 5px;">수정</button>
               <button class="btn btn-danger" onclick="deleteProblem('${problem.id}')">삭제</button>

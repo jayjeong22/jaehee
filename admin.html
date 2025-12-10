@@ -233,6 +233,15 @@
         </select>
       </div>
       <div class="form-group">
+        <label>문제 이미지 (선택사항)</label>
+        <input type="file" id="problemImage" accept="image/png,image/jpeg,image/jpg">
+        <small style="color: #8B8BAA; display: block; margin-top: 5px;">PNG, JPEG, JPG 파일만 업로드 가능합니다.</small>
+        <div id="imagePreview" style="margin-top: 10px; display: none;">
+          <img id="previewImg" style="max-width: 300px; max-height: 300px; border-radius: 8px; border: 2px solid #E5DDFF;" />
+          <button type="button" class="btn btn-danger" id="removeImageBtn" style="margin-top: 10px; display: block;">이미지 제거</button>
+        </div>
+      </div>
+      <div class="form-group">
         <label>문제 내용</label>
         <textarea id="problemQuestion" placeholder="문제를 입력하세요"></textarea>
       </div>
