@@ -96,6 +96,13 @@ document.querySelectorAll('.difficulty-btn').forEach(btn => {
 
 // 문제 풀이 시작
 function startQuiz() {
+  // 제한된 학년/단원 체크
+  if (currentGrade === 4 || currentGrade === 6 || (currentGrade === 5 && currentUnit === 4)) {
+    alert('아직 문제가 없습니다. 다른 단원을 선택하세요.');
+    showScreen('unitSelectScreen');
+    return;
+  }
+  
   const difficultyKey = ['easy', 'medium', 'hard'][currentDifficulty - 1];
   
   // Firestore에서 문제를 우선적으로 사용, 없으면 로컬 문제 사용
