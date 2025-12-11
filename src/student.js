@@ -13,6 +13,7 @@ let answerMode = 'immediate';
 let wrongProblems = [];
 let currentNoteData = null;
 let firestoreProblems = {}; // Firestore에서 로드한 문제들
+let nextAttemptNumber = null; // 재도전 시 미리 계산된 다음 시도 번호
 
 // 인증 상태 확인
 onAuthStateChanged(auth, (user) => {
@@ -82,6 +83,9 @@ document.getElementById('startBtn')?.addEventListener('click', () => {
   } else {
     currentDifficulty = 1;
   }
+  
+  // 일반 문제 풀이 시작 시 재도전 번호 초기화
+  nextAttemptNumber = null;
   
   startQuiz();
 });
@@ -459,6 +463,41 @@ async function saveResult() {
   if (!currentUser) return;
   
   try {
+    // 재도전 시 미리 계산된 시도 번호가 있으면 사용, 없으면 계산
+    let attemptNumber = 1;
+    
+    if (nextAttemptNumber !== null) {
+      // 재도전 버튼을 통해 미리 계산된 경우
+      attemptNumber = nextAttemptNumber;
+      nextAttemptNumber = null; // 사용 후 초기화
+      console.log(`재도전 결과 저장: ${attemptNumber}차`);
+    } else {
+      // 일반적인 경우: 이전 결과를 조회하여 계산
+      try {
+        const previousResultsQuery = query(
+          collection(db, 'results'),
+          where('userId', '==', currentUser.uid),
+          where('grade', '==', currentGrade),
+          where('unit', '==', currentUnit),
+          where('difficulty', '==', currentDifficulty)
+        );
+        const previousResultsSnapshot = await getDocs(previousResultsQuery);
+        
+        if (!previousResultsSnapshot.empty) {
+          // 이전 결과가 있으면 최대 재도전 횟수 + 1
+          const previousAttempts = previousResultsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return data.attemptNumber || 1;
+          });
+          attemptNumber = Math.max(...previousAttempts) + 1;
+          console.log(`일반 결과 저장: ${attemptNumber}차`);
+        }
+      } catch (queryError) {
+        // 쿼리 오류가 발생해도 계속 진행 (첫 시도로 간주)
+        console.log('이전 결과 조회 중 오류 (첫 시도로 간주):', queryError);
+      }
+    }
+    
     // 서술형 문제 개수 계산
     const drawingProblems = currentProblems.filter(p => p.type === 'drawing').length;
     const autoGradedProblems = currentProblems.filter(p => p.type !== 'drawing');
@@ -480,7 +519,8 @@ async function saveResult() {
       score: score,
       timestamp: new Date(),
       answers: userAnswers,
-      wrongProblems: wrongProblems.map(p => p.id)
+      wrongProblems: wrongProblems.map(p => p.id),
+      attemptNumber: attemptNumber
     });
   } catch (error) {
     console.error('결과 저장 오류:', error);
@@ -1485,10 +1525,41 @@ async function showNoteDetail(noteId, note) {
 }
 
 // 재도전
-document.getElementById('retryBtn')?.addEventListener('click', function() {
+document.getElementById('retryBtn')?.addEventListener('click', async function() {
   currentGrade = parseInt(this.dataset.grade);
   currentUnit = parseInt(this.dataset.unit);
   currentDifficulty = parseInt(this.dataset.difficulty);
+  
+  // 재도전 시 이전 결과를 조회하여 다음 시도 번호 미리 계산
+  if (currentUser) {
+    try {
+      const previousResultsQuery = query(
+        collection(db, 'results'),
+        where('userId', '==', currentUser.uid),
+        where('grade', '==', currentGrade),
+        where('unit', '==', currentUnit),
+        where('difficulty', '==', currentDifficulty)
+      );
+      const previousResultsSnapshot = await getDocs(previousResultsQuery);
+      
+      if (!previousResultsSnapshot.empty) {
+        // 이전 결과가 있으면 최대 재도전 횟수 + 1
+        const previousAttempts = previousResultsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return data.attemptNumber || 1;
+        });
+        nextAttemptNumber = Math.max(...previousAttempts) + 1;
+        console.log(`재도전: 다음 시도 번호는 ${nextAttemptNumber}차입니다.`);
+      } else {
+        // 이전 결과가 없으면 1차
+        nextAttemptNumber = 1;
+      }
+    } catch (queryError) {
+      console.error('재도전 시 이전 결과 조회 오류:', queryError);
+      // 오류 발생 시 null로 설정하여 saveResult에서 다시 계산하도록 함
+      nextAttemptNumber = null;
+    }
+  }
   
   document.getElementById('gradeSelect').value = currentGrade;
   document.getElementById('unitSelect').value = currentUnit;

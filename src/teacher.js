@@ -457,10 +457,30 @@ function renderStudentNotes(userId) {
 function renderResultsTable(results) {
   const container = document.getElementById('resultsTable');
   
+  // 같은 학년/단원/난이도 조합별로 그룹화
+  const groupedResults = new Map();
+  results.forEach(result => {
+    const key = `${result.grade}-${result.unit}-${result.difficulty}`;
+    if (!groupedResults.has(key)) {
+      groupedResults.set(key, []);
+    }
+    groupedResults.get(key).push(result);
+  });
+  
+  // 각 그룹 내에서 재도전 횟수 순으로 정렬
+  groupedResults.forEach((groupResults, key) => {
+    groupResults.sort((a, b) => {
+      const attemptA = a.attemptNumber || 1;
+      const attemptB = b.attemptNumber || 1;
+      return attemptA - attemptB;
+    });
+  });
+  
   let tableHTML = `
     <table>
       <thead>
         <tr>
+          <th>도전</th>
           <th>날짜</th>
           <th>학년</th>
           <th>단원</th>
@@ -475,23 +495,42 @@ function renderResultsTable(results) {
       <tbody>
   `;
 
-  results.forEach(result => {
-    const date = new Date(result.timestamp.toDate()).toLocaleString('ko-KR');
-    tableHTML += `
-      <tr>
-        <td>${date}</td>
-        <td>${result.grade}학년</td>
-        <td>${result.unit}단원</td>
-        <td>${['쉬움', '보통', '어려움'][result.difficulty - 1]}</td>
-        <td>${result.totalProblems}</td>
-        <td>${result.correctCount}</td>
-        <td>${result.wrongCount}</td>
-        <td>${result.score}점</td>
-        <td>
-          <button class="btn btn-danger" onclick="deleteResult('${result.id}')" style="padding: 5px 10px; font-size: 12px;">삭제</button>
-        </td>
-      </tr>
-    `;
+  // 그룹별로 결과 표시 (같은 학년/단원/난이도는 함께 표시)
+  groupedResults.forEach((groupResults, key) => {
+    groupResults.forEach((result, index) => {
+      const date = new Date(result.timestamp.toDate()).toLocaleString('ko-KR');
+      const attemptNumber = result.attemptNumber || 1;
+      const attemptLabel = `${attemptNumber}차`;
+      
+      // 같은 그룹의 첫 번째 결과가 아니면 학년/단원/난이도는 빈 칸으로 표시
+      const gradeText = index === 0 ? `${result.grade}학년` : '';
+      const unitText = index === 0 ? `${result.unit}단원` : '';
+      const difficultyText = index === 0 ? `${['쉬움', '보통', '어려움'][result.difficulty - 1]}` : '';
+      
+      // 재도전 횟수에 따라 배경색 구분
+      const rowStyle = attemptNumber === 1 
+        ? 'background-color: #E8F5E9;' 
+        : attemptNumber === 2 
+        ? 'background-color: #FFF3E0;' 
+        : 'background-color: #FFEBEE;';
+      
+      tableHTML += `
+        <tr style="${rowStyle}">
+          <td><strong style="color: #1976D2; font-size: 14px;">${attemptLabel}</strong></td>
+          <td>${date}</td>
+          <td>${gradeText}</td>
+          <td>${unitText}</td>
+          <td>${difficultyText}</td>
+          <td>${result.totalProblems}</td>
+          <td>${result.correctCount}</td>
+          <td>${result.wrongCount}</td>
+          <td>${result.score}점</td>
+          <td>
+            <button class="btn btn-danger" onclick="deleteResult('${result.id}')" style="padding: 5px 10px; font-size: 12px;">삭제</button>
+          </td>
+        </tr>
+      `;
+    });
   });
 
   tableHTML += `
