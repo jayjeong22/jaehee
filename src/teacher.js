@@ -374,11 +374,11 @@ function renderStudentNotes(userId) {
     noteDiv.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div style="flex: 1;">
-          <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
+        <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
           <span style="color: #8B8BAA; font-size: 14px; margin-left: 10px;">
-            ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
-          </span>
-        </div>
+          ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
+        </span>
+      </div>
         <div style="display: flex; gap: 10px;">
           <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
             펼치기
@@ -387,7 +387,7 @@ function renderStudentNotes(userId) {
             삭제
           </button>
         </div>
-      </div>
+          </div>
       <p style="margin-bottom: 10px;">틀린 문제 ${note.problems.length}개</p>
       <div id="${contentId}" style="margin-top: 15px; display: none;">
         ${problemsHtml}

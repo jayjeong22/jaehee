@@ -274,9 +274,9 @@ function checkAnswerImmediate(problem, userAnswer, element) {
         opt.classList.add('selected');
         // 정답 여부에 따라 스타일만 적용 (정답은 표시하지 않음)
         if (isCorrect) {
-          opt.classList.add('correct');
+        opt.classList.add('correct');
         } else {
-          opt.classList.add('incorrect');
+        opt.classList.add('incorrect');
         }
       }
     });
@@ -702,10 +702,10 @@ function initDrawingCanvas(problemId) {
     return;
   }
   
-  // 펜 설정: 5px 두께의 검은색 펜
+  // 펜 설정: 1px 두께의 검은색 펜
   ctx.strokeStyle = '#000000';
   ctx.fillStyle = '#000000';
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 1;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   
@@ -753,9 +753,9 @@ function initDrawingCanvas(problemId) {
     
     // 첫 점도 그리기
     ctx.beginPath();
-    ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
+    ctx.arc(lastX, lastY, 0.5, 0, Math.PI * 2);
     ctx.fill();
-    
+  
     // 즉시 저장
     saveDrawingAnswer(problemId);
   }
@@ -770,7 +770,7 @@ function initDrawingCanvas(problemId) {
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
     ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
+      ctx.stroke();
     
     lastX = pos.x;
     lastY = pos.y;
@@ -789,7 +789,7 @@ function initDrawingCanvas(problemId) {
     }
     
     if (isDrawing) {
-      isDrawing = false;
+    isDrawing = false;
       // 현재 캔버스 상태를 히스토리에 저장
       drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
       // 마지막 저장
@@ -939,10 +939,10 @@ function initNoteCanvas(problemId) {
     return;
   }
   
-  // 펜 설정: 5px 두께의 검은색 펜
+  // 펜 설정: 1px 두께의 검은색 펜
   ctx.strokeStyle = '#000000';
   ctx.fillStyle = '#000000';
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 1;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   
@@ -990,7 +990,7 @@ function initNoteCanvas(problemId) {
     
     // 첫 점도 그리기
     ctx.beginPath();
-    ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2);
+    ctx.arc(lastX, lastY, 0.5, 0, Math.PI * 2);
     ctx.fill();
   }
   
@@ -1004,7 +1004,7 @@ function initNoteCanvas(problemId) {
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
     ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
+      ctx.stroke();
     
     lastX = pos.x;
     lastY = pos.y;
@@ -1024,7 +1024,7 @@ function initNoteCanvas(problemId) {
     }
     
     if (isDrawing) {
-      isDrawing = false;
+    isDrawing = false;
       // 현재 캔버스 상태를 히스토리에 저장
       noteDrawingHistory[problemId].push(ctx.getImageData(0, 0, canvas.width, canvas.height));
       // 최대 50개까지만 저장 (메모리 관리)

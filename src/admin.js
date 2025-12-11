@@ -371,7 +371,7 @@ document.getElementById('addProblemBtn')?.addEventListener('click', async () => 
     } else {
       // 추가 모드: 새 문제 추가
       console.log('저장할 문제 데이터:', problemData);
-      await addDoc(collection(db, 'problems'), problemData);
+    await addDoc(collection(db, 'problems'), problemData);
       showStatus(`✅ 문제가 Firestore에 저장되었습니다! 학생이 ${grade}학년 ${unit}단원을 선택하면 자동으로 로드됩니다.`, 'success');
     }
     
@@ -386,18 +386,18 @@ document.getElementById('addProblemBtn')?.addEventListener('click', async () => 
 
 // 폼 초기화 함수
 function resetProblemForm() {
-  document.getElementById('problemQuestion').value = '';
-  document.getElementById('problemAnswer').value = '';
+    document.getElementById('problemQuestion').value = '';
+    document.getElementById('problemAnswer').value = '';
   document.getElementById('problemType').value = 'multiple'; // 기본값으로 리셋
-  for (let i = 0; i < 4; i++) {
-    document.getElementById(`option${i}`).value = '';
-    if (i === 0) {
-      document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = true;
-    } else {
-      document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = false;
+    for (let i = 0; i < 4; i++) {
+      document.getElementById(`option${i}`).value = '';
+      if (i === 0) {
+        document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = true;
+      } else {
+        document.querySelector(`input[name="correctOption"][value="${i}"]`).checked = false;
+      }
     }
-  }
-  
+    
   // 이미지 초기화
   const fileInput = document.getElementById('problemImage');
   const preview = document.getElementById('imagePreview');
@@ -575,7 +575,7 @@ async function loadProblems() {
             <strong>문제 ${index + 1} (${difficultySprouts} ${typeLabel})${imageIndicator}</strong>
             <div>
               <button class="btn btn-primary" onclick="editProblem('${problem.id}')" style="margin-right: 5px;">수정</button>
-              <button class="btn btn-danger" onclick="deleteProblem('${problem.id}')">삭제</button>
+            <button class="btn btn-danger" onclick="deleteProblem('${problem.id}')">삭제</button>
             </div>
           </div>
           <div><strong>질문:</strong> ${problem.question}</div>

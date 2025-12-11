@@ -109,7 +109,7 @@ document.getElementById('goStudentBtn')?.addEventListener('click', () => {
 
 document.getElementById('goTeacherBtn')?.addEventListener('click', () => {
   if (auth.currentUser && isAdmin(auth.currentUser)) {
-    window.location.href = '/teacherMonitor.html';
+  window.location.href = '/teacherMonitor.html';
   } else {
     alert('관리자만 접근할 수 있습니다.');
   }
@@ -117,7 +117,7 @@ document.getElementById('goTeacherBtn')?.addEventListener('click', () => {
 
 document.getElementById('goAdminBtn')?.addEventListener('click', () => {
   if (auth.currentUser && isAdmin(auth.currentUser)) {
-    window.location.href = '/admin.html';
+  window.location.href = '/admin.html';
   } else {
     alert('관리자만 접근할 수 있습니다.');
   }
