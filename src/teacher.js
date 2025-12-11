@@ -369,6 +369,8 @@ function renderStudentNotes(userId) {
       `;
     }).join('');
     
+    const deleteBtnId = `note-delete-${note.id || noteIndex}`;
+    
     noteDiv.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div style="flex: 1;">
@@ -377,9 +379,14 @@ function renderStudentNotes(userId) {
             ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
           </span>
         </div>
-        <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
-          펼치기
-        </button>
+        <div style="display: flex; gap: 10px;">
+          <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+            펼치기
+          </button>
+          <button id="${deleteBtnId}" class="btn btn-danger" style="padding: 8px 16px; font-size: 14px;">
+            삭제
+          </button>
+        </div>
       </div>
       <p style="margin-bottom: 10px;">틀린 문제 ${note.problems.length}개</p>
       <div id="${contentId}" style="margin-top: 15px; display: none;">
@@ -399,6 +406,48 @@ function renderStudentNotes(userId) {
       } else {
         contentDiv.style.display = 'none';
         toggleBtn.textContent = '펼치기';
+      }
+    });
+    
+    // 삭제 버튼 이벤트
+    const deleteBtn = document.getElementById(deleteBtnId);
+    deleteBtn.addEventListener('click', async (e) => {
+      e.stopPropagation(); // 이벤트 전파 방지
+      
+      if (!confirm('이 오답노트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+        return;
+      }
+      
+      try {
+        await deleteDoc(doc(db, 'notes', note.id));
+        
+        // 데이터 다시 로드
+        await loadAllData();
+        
+        // 현재 선택된 학생이 있으면 상세 화면 다시 렌더링
+        if (selectedStudent) {
+          const studentData = {
+            userName: selectedStudent.userName,
+            results: allResults.filter(r => r.userId === selectedStudent.userId),
+            totalScore: 0,
+            totalTests: 0,
+            totalWrong: 0
+          };
+          
+          // 통계 재계산
+          studentData.results.forEach(result => {
+            studentData.totalScore += result.score;
+            studentData.totalTests++;
+            studentData.totalWrong += result.wrongCount || 0;
+          });
+          
+          showStudentDetail(selectedStudent.userId, studentData);
+        }
+        
+        alert('오답노트가 삭제되었습니다.');
+      } catch (error) {
+        console.error('오답노트 삭제 오류:', error);
+        alert('오답노트 삭제에 실패했습니다: ' + error.message);
       }
     });
   });
@@ -455,12 +504,54 @@ function renderResultsTable(results) {
 
 // 결과 삭제 함수
 window.deleteResult = async function(resultId) {
-  if (!confirm('이 결과를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+  if (!confirm('이 결과를 삭제하시겠습니까? 관련된 오답노트도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.')) {
     return;
   }
 
   try {
+    // 삭제할 결과 정보 가져오기
+    const resultToDelete = allResults.find(r => r.id === resultId);
+    if (!resultToDelete) {
+      alert('삭제할 결과를 찾을 수 없습니다.');
+      return;
+    }
+
+    // 결과 삭제
     await deleteDoc(doc(db, 'results', resultId));
+    
+    // 관련된 오답노트 찾기 및 삭제
+    // 같은 userId, grade, unit, difficulty를 가진 오답노트 중에서
+    // timestamp가 비슷한(같은 날짜 또는 1시간 이내) 오답노트를 찾아 삭제
+    const resultTimestamp = resultToDelete.timestamp?.toDate ? resultToDelete.timestamp.toDate() : new Date(resultToDelete.timestamp);
+    const resultTime = resultTimestamp.getTime();
+    
+    const relatedNotes = allNotes.filter(note => {
+      if (note.userId !== resultToDelete.userId) return false;
+      if (note.grade !== resultToDelete.grade) return false;
+      if (note.unit !== resultToDelete.unit) return false;
+      if (note.difficulty !== resultToDelete.difficulty) return false;
+      
+      // timestamp 비교 (같은 날짜이거나 1시간 이내)
+      const noteTimestamp = note.timestamp?.toDate ? note.timestamp.toDate() : new Date(note.timestamp);
+      const noteTime = noteTimestamp.getTime();
+      const timeDiff = Math.abs(resultTime - noteTime);
+      
+      // 같은 날짜이거나 1시간(3600000ms) 이내 차이
+      return timeDiff < 3600000 || 
+             (resultTimestamp.getDate() === noteTimestamp.getDate() &&
+              resultTimestamp.getMonth() === noteTimestamp.getMonth() &&
+              resultTimestamp.getFullYear() === noteTimestamp.getFullYear());
+    });
+    
+    // 관련된 오답노트 삭제
+    for (const note of relatedNotes) {
+      try {
+        await deleteDoc(doc(db, 'notes', note.id));
+        console.log(`오답노트 ${note.id} 삭제됨`);
+      } catch (noteError) {
+        console.error(`오답노트 ${note.id} 삭제 실패:`, noteError);
+      }
+    }
     
     // 데이터 다시 로드
     await loadAllData();
@@ -485,7 +576,12 @@ window.deleteResult = async function(resultId) {
       showStudentDetail(selectedStudent.userId, studentData);
     }
     
-    alert('결과가 삭제되었습니다.');
+    const noteCount = relatedNotes.length;
+    if (noteCount > 0) {
+      alert(`결과와 관련된 오답노트 ${noteCount}개가 삭제되었습니다.`);
+    } else {
+      alert('결과가 삭제되었습니다.');
+    }
   } catch (error) {
     console.error('결과 삭제 오류:', error);
     alert('결과 삭제에 실패했습니다: ' + error.message);

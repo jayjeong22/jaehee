@@ -1187,17 +1187,28 @@ document.getElementById('viewNotesBtn')?.addEventListener('click', () => {
 
 // 오답노트 로드
 async function loadNotes() {
-  if (!currentUser) return;
+  if (!currentUser) {
+    console.error('currentUser가 없습니다.');
+    return;
+  }
+  
+  const notesList = document.getElementById('notesList');
+  if (!notesList) {
+    console.error('notesList 요소를 찾을 수 없습니다.');
+    return;
+  }
+  
+  notesList.innerHTML = '<p>오답노트를 불러오는 중...</p>';
   
   try {
+    // where와 orderBy를 함께 사용할 때 인덱스 문제를 피하기 위해
+    // 먼저 userId로 필터링한 후 클라이언트 측에서 정렬
     const q = query(
       collection(db, 'notes'),
-      where('userId', '==', currentUser.uid),
-      orderBy('timestamp', 'desc')
+      where('userId', '==', currentUser.uid)
     );
     const querySnapshot = await getDocs(q);
     
-    const notesList = document.getElementById('notesList');
     notesList.innerHTML = '';
     
     if (querySnapshot.empty) {
@@ -1205,24 +1216,41 @@ async function loadNotes() {
       return;
     }
     
+    // 결과를 배열로 변환하고 클라이언트 측에서 정렬
+    const notes = [];
     querySnapshot.forEach((doc) => {
       const note = doc.data();
+      notes.push({
+        id: doc.id,
+        ...note,
+        timestampValue: note.timestamp?.toDate ? note.timestamp.toDate().getTime() : 0
+      });
+    });
+    
+    // 타임스탬프 기준으로 내림차순 정렬
+    notes.sort((a, b) => b.timestampValue - a.timestampValue);
+    
+    // 정렬된 노트들을 표시
+    notes.forEach((note) => {
       const noteDiv = document.createElement('div');
       noteDiv.className = 'note-item';
       noteDiv.innerHTML = `
         <div class="note-header">
           <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
-          <span class="note-date">${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}</span>
+          <span class="note-date">${note.timestamp?.toDate ? new Date(note.timestamp.toDate()).toLocaleString('ko-KR') : '날짜 없음'}</span>
         </div>
-        <p>틀린 문제 ${note.problems.length}개</p>
+        <p>틀린 문제 ${note.problems?.length || 0}개</p>
       `;
       noteDiv.addEventListener('click', () => {
-        showNoteDetail(doc.id, note);
+        showNoteDetail(note.id, note);
       });
       notesList.appendChild(noteDiv);
     });
   } catch (error) {
     console.error('오답노트 로드 오류:', error);
+    console.error('오류 상세:', error.message);
+    console.error('currentUser.uid:', currentUser?.uid);
+    notesList.innerHTML = `<p style="color: red;">오답노트를 불러오는 중 오류가 발생했습니다: ${error.message}</p>`;
   }
 }
 
