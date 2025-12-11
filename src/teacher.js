@@ -316,9 +316,13 @@ function renderStudentNotes(userId) {
     return;
   }
 
-  studentNotes.forEach(note => {
+  studentNotes.forEach((note, noteIndex) => {
     const noteDiv = document.createElement('div');
     noteDiv.className = 'note-item';
+    
+    const noteId = `note-${note.id || noteIndex}`;
+    const contentId = `note-content-${note.id || noteIndex}`;
+    const toggleBtnId = `note-toggle-${note.id || noteIndex}`;
     
     // 각 문제별 오답노트 내용 생성
     const problemsHtml = note.problems.map((p, idx) => {
@@ -366,18 +370,37 @@ function renderStudentNotes(userId) {
     }).join('');
     
     noteDiv.innerHTML = `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-        <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
-        <span style="color: #8B8BAA; font-size: 14px;">
-          ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
-        </span>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div style="flex: 1;">
+          <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
+          <span style="color: #8B8BAA; font-size: 14px; margin-left: 10px;">
+            ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
+          </span>
+        </div>
+        <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+          펼치기
+        </button>
       </div>
       <p style="margin-bottom: 10px;">틀린 문제 ${note.problems.length}개</p>
-      <div style="margin-top: 15px;">
+      <div id="${contentId}" style="margin-top: 15px; display: none;">
         ${problemsHtml}
       </div>
     `;
     container.appendChild(noteDiv);
+    
+    // 접기/펼치기 버튼 이벤트
+    const toggleBtn = document.getElementById(toggleBtnId);
+    const contentDiv = document.getElementById(contentId);
+    
+    toggleBtn.addEventListener('click', () => {
+      if (contentDiv.style.display === 'none') {
+        contentDiv.style.display = 'block';
+        toggleBtn.textContent = '접기';
+      } else {
+        contentDiv.style.display = 'none';
+        toggleBtn.textContent = '펼치기';
+      }
+    });
   });
 }
 
