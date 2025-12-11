@@ -400,7 +400,7 @@ function showResult() {
   const createNoteBtn = document.getElementById('createNoteBtn');
   
   if (wrongProblems.length === 0) {
-    wrongContainer.innerHTML = '<p style="color: #DDFFDD; font-size: 18px;">모든 문제를 맞추셨습니다! 🎉</p>';
+    wrongContainer.innerHTML = '<p style="color: #2E7D32; font-weight: bold; font-size: 20px;">모든 문제를 맞추셨습니다! 🎉</p>';
     // 오답노트 버튼 숨기기
     if (createNoteBtn) {
       createNoteBtn.style.display = 'none';
