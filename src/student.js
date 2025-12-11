@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, getDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig.js';
 import { problems as localProblems } from './data/problems.js';
 
@@ -296,8 +296,8 @@ function checkAnswerImmediate(problem, userAnswer, element) {
   const feedbackDiv = document.getElementById(`feedback-${problem.id}`);
   if (feedbackDiv) {
     feedbackDiv.innerHTML = isCorrect 
-      ? '<span style="color: #DDFFDD;">✓ 정답입니다!</span>'
-      : '<span style="color: #FFDDDD;">✗ 오답입니다.</span>';
+      ? '<span style="color: #2E7D32; font-weight: bold; font-size: 18px;">✓ 정답입니다!</span>'
+      : '<span style="color: #C62828; font-weight: bold; font-size: 18px;">✗ 오답입니다.</span>';
   }
   
   updateProgress();
@@ -1254,15 +1254,144 @@ async function loadNotes() {
   }
 }
 
+// 오답 원인을 한글로 변환
+function getReasonInKorean(reason) {
+  if (!reason) return '미입력';
+  
+  const reasonMap = {
+    'concept': '개념 부족',
+    'understanding': '문제 이해 못 함',
+    'calculation': '계산 실수',
+    'careless': '집중 부족'
+  };
+  
+  // 이미 한글이거나 매핑에 없는 경우 그대로 반환
+  return reasonMap[reason] || reason;
+}
+
+// 오답노트 내용 HTML 생성 함수
+function getNoteContentHtml(noteProblem) {
+  if (noteProblem.mode === 'drawing' && noteProblem.drawing) {
+    return `
+      <div style="margin-top: 15px;">
+        <strong>오답노트 (그리기):</strong>
+        <img src="${noteProblem.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin-top: 10px; display: block;">
+      </div>
+    `;
+  } else if (noteProblem.mode === 'text' && noteProblem.content) {
+    return `
+      <div style="margin-top: 15px;">
+        <strong>오답노트 (직접 쓰기):</strong>
+        <div style="margin-top: 10px; padding: 12px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px; white-space: pre-wrap; font-size: 16px; line-height: 1.6;">
+          ${noteProblem.content}
+        </div>
+      </div>
+    `;
+  } else if (noteProblem.drawing) {
+    // 기존 데이터 호환성 (mode가 없는 경우)
+    return `
+      <div style="margin-top: 15px;">
+        <strong>오답노트:</strong>
+        <img src="${noteProblem.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin-top: 10px; display: block;">
+      </div>
+    `;
+  }
+  return '';
+}
+
 // 오답노트 상세 보기
-function showNoteDetail(noteId, note) {
+async function showNoteDetail(noteId, note) {
   const container = document.getElementById('noteDetailContent');
+  container.innerHTML = '<p>오답노트를 불러오는 중...</p>';
+  
+  // 문제 정보를 저장할 맵
+  const problemMap = new Map();
+  // 사용자 답안 정보를 저장할 맵 (결과 데이터에서 가져올 수 있음)
+  const userAnswerMap = new Map();
+  
+  // 결과 데이터에서 사용자 답안 정보 가져오기
+  try {
+    const resultsQuery = query(
+      collection(db, 'results'),
+      where('userId', '==', currentUser.uid),
+      where('grade', '==', note.grade),
+      where('unit', '==', note.unit),
+      where('difficulty', '==', note.difficulty)
+    );
+    const resultsSnapshot = await getDocs(resultsQuery);
+    
+    resultsSnapshot.forEach((doc) => {
+      const result = doc.data();
+      if (result.answers) {
+        Object.entries(result.answers).forEach(([problemId, answer]) => {
+          if (!userAnswerMap.has(problemId)) {
+            userAnswerMap.set(problemId, answer);
+          }
+        });
+      }
+    });
+  } catch (error) {
+    console.error('결과 데이터 로드 오류:', error);
+  }
+  
+  // Firestore에서 문제 정보 가져오기
+  try {
+    for (const noteProblem of note.problems) {
+      if (noteProblem.problemId && !problemMap.has(noteProblem.problemId)) {
+        try {
+          const problemDoc = await getDoc(doc(db, 'problems', noteProblem.problemId));
+          if (problemDoc.exists()) {
+            const problemData = { id: problemDoc.id, ...problemDoc.data() };
+            // 사용자 답안 정보 추가
+            if (userAnswerMap.has(noteProblem.problemId)) {
+              problemData.userAnswer = userAnswerMap.get(noteProblem.problemId);
+            }
+            problemMap.set(noteProblem.problemId, problemData);
+          }
+        } catch (error) {
+          console.error(`문제 ${noteProblem.problemId} 로드 실패:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('문제 정보 로드 오류:', error);
+  }
+  
+  // 로컬 문제도 확인 (Firestore에 없는 경우)
+  for (const noteProblem of note.problems) {
+    if (noteProblem.problemId && !problemMap.has(noteProblem.problemId)) {
+      // wrongProblems나 currentProblems에서 찾기
+      const localProblem = wrongProblems.find(p => p.id === noteProblem.problemId) || 
+                          currentProblems.find(p => p.id === noteProblem.problemId);
+      if (localProblem) {
+        // 사용자 답안 정보 추가
+        if (userAnswerMap.has(noteProblem.problemId)) {
+          localProblem.userAnswer = userAnswerMap.get(noteProblem.problemId);
+        }
+        problemMap.set(noteProblem.problemId, localProblem);
+      }
+    }
+  }
+  
   container.innerHTML = '';
   
   note.problems.forEach((noteProblem, index) => {
-    const problem = wrongProblems.find(p => p.id === noteProblem.problemId) || 
-                   currentProblems.find(p => p.id === noteProblem.problemId);
-    if (!problem) return;
+    const problem = problemMap.get(noteProblem.problemId);
+    if (!problem) {
+      // 문제 정보를 찾을 수 없는 경우에도 오답노트 내용은 표시
+      const noteDiv = document.createElement('div');
+      noteDiv.className = 'question-card';
+      noteDiv.innerHTML = `
+        <div class="question-number">문제 ${index + 1}</div>
+        <div class="question-text">문제 정보를 불러올 수 없습니다. (문제 ID: ${noteProblem.problemId})</div>
+        <div style="margin: 10px 0;">
+          <strong>오답 원인:</strong> ${getReasonInKorean(noteProblem.reason)}
+        </div>
+        ${getNoteContentHtml(noteProblem)}
+      `;
+      container.appendChild(noteDiv);
+      return;
+    }
     
     // 이미지 표시 (있는 경우)
     let imageHtml = '';
@@ -1317,32 +1446,7 @@ function showNoteDetail(noteId, note) {
     }
     
     // 오답노트 내용 표시
-    let noteContentHtml = '';
-    if (noteProblem.mode === 'drawing' && noteProblem.drawing) {
-      noteContentHtml = `
-        <div style="margin-top: 15px;">
-          <strong>오답노트 (그리기):</strong>
-          <img src="${noteProblem.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin-top: 10px; display: block;">
-        </div>
-      `;
-    } else if (noteProblem.mode === 'text' && noteProblem.content) {
-      noteContentHtml = `
-        <div style="margin-top: 15px;">
-          <strong>오답노트 (직접 쓰기):</strong>
-          <div style="margin-top: 10px; padding: 12px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px; white-space: pre-wrap; font-size: 16px; line-height: 1.6;">
-            ${noteProblem.content}
-          </div>
-        </div>
-      `;
-    } else if (noteProblem.drawing) {
-      // 기존 데이터 호환성 (mode가 없는 경우)
-      noteContentHtml = `
-        <div style="margin-top: 15px;">
-          <strong>오답노트:</strong>
-          <img src="${noteProblem.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin-top: 10px; display: block;">
-        </div>
-      `;
-    }
+    const noteContentHtml = getNoteContentHtml(noteProblem);
     
     const noteDiv = document.createElement('div');
     noteDiv.className = 'question-card';
@@ -1357,7 +1461,7 @@ function showNoteDetail(noteId, note) {
         </div>
       </div>
       <div style="margin: 10px 0;">
-        <strong>오답 원인:</strong> ${noteProblem.reason || '미입력'}
+        <strong>오답 원인:</strong> ${getReasonInKorean(noteProblem.reason) || '미입력'}
       </div>
       ${noteContentHtml}
     `;
