@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig.js';
 import { problems } from './data/problems.js';
 import { isAdmin } from './adminConfig.js';
@@ -305,7 +305,7 @@ function renderReasonStats(userId) {
 }
 
 // 학생 오답노트 목록
-function renderStudentNotes(userId) {
+async function renderStudentNotes(userId) {
   const container = document.getElementById('studentNotesList');
   container.innerHTML = '';
 
@@ -316,7 +316,11 @@ function renderStudentNotes(userId) {
     return;
   }
 
-  studentNotes.forEach((note, noteIndex) => {
+  // 해당 학생의 결과 데이터 찾기 (학생 답안 확인용)
+  const studentResults = allResults.filter(r => r.userId === userId);
+
+  for (const note of studentNotes) {
+    const noteIndex = studentNotes.indexOf(note);
     const noteDiv = document.createElement('div');
     noteDiv.className = 'note-item';
     
@@ -324,9 +328,103 @@ function renderStudentNotes(userId) {
     const contentId = `note-content-${note.id || noteIndex}`;
     const toggleBtnId = `note-toggle-${note.id || noteIndex}`;
     
+    // 해당 오답노트와 관련된 결과 찾기 (같은 학년/단원/난이도, 비슷한 시간)
+    const relatedResult = studentResults.find(result => {
+      if (result.grade !== note.grade || result.unit !== note.unit || result.difficulty !== note.difficulty) {
+        return false;
+      }
+      const resultTime = result.timestamp?.toDate ? result.timestamp.toDate() : new Date(result.timestamp);
+      const noteTime = note.timestamp?.toDate ? note.timestamp.toDate() : new Date(note.timestamp);
+      const timeDiff = Math.abs(resultTime.getTime() - noteTime.getTime());
+      return timeDiff < 3600000; // 1시간 이내
+    });
+    
     // 각 문제별 오답노트 내용 생성
-    const problemsHtml = note.problems.map((p, idx) => {
+    const problemsHtmlPromises = note.problems.map(async (p, idx) => {
       const reasonText = p.reason ? getReasonInKorean(p.reason) : '원인 미입력';
+      
+      // 문제 정보 가져오기
+      let problemData = null;
+      let userAnswer = null;
+      
+      if (p.problemId) {
+        try {
+          const problemDoc = await getDoc(doc(db, 'problems', p.problemId));
+          if (problemDoc.exists()) {
+            problemData = { id: problemDoc.id, ...problemDoc.data() };
+          }
+        } catch (error) {
+          console.error(`문제 ${p.problemId} 로드 오류:`, error);
+        }
+      }
+      
+      // 학생 답안 찾기
+      if (relatedResult && relatedResult.answers && p.problemId) {
+        userAnswer = relatedResult.answers[p.problemId];
+      }
+      
+      // 문제 내용 HTML 생성
+      let problemHtml = '';
+      if (problemData) {
+        // 이미지가 있는 경우
+        const imageHtml = problemData.imageUrl 
+          ? `<img src="${problemData.imageUrl}" style="max-width: 100%; margin-bottom: 10px; border: 2px solid #E5DDFF; border-radius: 8px; display: block;">`
+          : '';
+        
+        // 문제 텍스트
+        const questionHtml = `<div style="margin-bottom: 15px; font-size: 15px; line-height: 1.6; color: #333;">${problemData.question}</div>`;
+        
+        // 객관식 선택지
+        let optionsHtml = '';
+        if (problemData.type === 'multiple' && problemData.options && Array.isArray(problemData.options)) {
+          optionsHtml = `
+            <div style="margin-bottom: 15px; padding: 12px; background: #F9F9F9; border-radius: 8px;">
+              ${problemData.options.map((option, optIndex) => {
+                const isCorrect = optIndex === problemData.correct;
+                const isUserAnswer = typeof userAnswer === 'number' && optIndex === userAnswer;
+                const optionStyle = isCorrect 
+                  ? 'color: #4CAF50; font-weight: bold;'
+                  : isUserAnswer 
+                  ? 'color: #C62828; font-weight: bold;'
+                  : 'color: #666;';
+                
+                return `
+                  <div style="${optionStyle} margin: 5px 0;">
+                    ${optIndex + 1}. ${option}
+                    ${isCorrect ? ' ✓ 정답' : ''}
+                    ${isUserAnswer && !isCorrect ? ' (학생이 선택한 답)' : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else if (problemData.type === 'short') {
+          // 주관식인 경우
+          const correctAnswer = problemData.answer || '';
+          const userAnswerText = userAnswer || '';
+          optionsHtml = `
+            <div style="margin-bottom: 15px; padding: 12px; background: #F9F9F9; border-radius: 8px;">
+              <div style="color: #4CAF50; font-weight: bold; margin-bottom: 5px;">정답: ${correctAnswer}</div>
+              ${userAnswerText ? `<div style="color: #C62828; font-weight: bold;">학생 답: ${userAnswerText}</div>` : ''}
+            </div>
+          `;
+        }
+        
+        problemHtml = `
+          <div style="margin-bottom: 15px; padding: 15px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
+            ${imageHtml}
+            ${questionHtml}
+            ${optionsHtml}
+          </div>
+        `;
+      } else {
+        // 문제 정보를 찾을 수 없는 경우
+        problemHtml = `
+          <div style="margin-bottom: 15px; padding: 15px; background: #FFF5F5; border: 2px solid #FFCDD2; border-radius: 8px; color: #C62828;">
+            문제 정보를 불러올 수 없습니다. (문제 ID: ${p.problemId || '없음'})
+          </div>
+        `;
+      }
       
       let noteContentHtml = '';
       
@@ -359,15 +457,19 @@ function renderStudentNotes(userId) {
       
       return `
         <div style="margin: 10px 0; padding: 15px; background: #FFFFFF; border: 2px solid #E5DDFF; border-radius: 8px;">
-          <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">문제 ${idx + 1}</div>
-          <div style="margin-bottom: 8px;">
-            <span style="font-weight: bold;">오답 원인:</span> 
-            <span style="color: #C62828;">${reasonText}</span>
+          <div style="font-weight: bold; margin-bottom: 12px; color: #6B6B8A; font-size: 16px;">문제 ${idx + 1}</div>
+          ${problemHtml}
+          <div style="margin-top: 15px; margin-bottom: 8px; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
+            <span style="font-weight: bold; color: #6B6B8A;">오답 원인:</span> 
+            <span style="color: #C62828; font-weight: bold;">${reasonText}</span>
           </div>
           ${noteContentHtml}
         </div>
       `;
-    }).join('');
+    });
+    
+    // 모든 문제 HTML 생성 완료 대기
+    const problemsHtml = await Promise.all(problemsHtmlPromises);
     
     const deleteBtnId = `note-delete-${note.id || noteIndex}`;
     
@@ -390,7 +492,7 @@ function renderStudentNotes(userId) {
           </div>
       <p style="margin-bottom: 10px;">틀린 문제 ${note.problems.length}개</p>
       <div id="${contentId}" style="margin-top: 15px; display: none;">
-        ${problemsHtml}
+        ${problemsHtml.join('')}
       </div>
     `;
     container.appendChild(noteDiv);
@@ -450,7 +552,7 @@ function renderStudentNotes(userId) {
         alert('오답노트 삭제에 실패했습니다: ' + error.message);
       }
     });
-  });
+  }
 }
 
 // 결과 테이블

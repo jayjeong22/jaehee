@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, getDocs, getDoc, query, where, doc, deleteDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, getDoc, query, where, doc, deleteDoc, setDoc, updateDoc, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from './firebaseConfig.js';
 import { isAdmin } from './adminConfig.js';
@@ -36,6 +36,33 @@ let currentUser = null;
 let problemIdCounter = 1;
 let editingProblemId = null; // 현재 수정 중인 문제 ID
 
+// 화면 전환
+function showScreen(screenId) {
+  const problemScreen = document.getElementById('problemManagementScreen');
+  const gradingScreen = document.getElementById('gradingManagementScreen');
+  
+  if (screenId === 'problem') {
+    problemScreen.classList.remove('hidden');
+    gradingScreen.classList.add('hidden');
+    document.querySelector('.header h1').textContent = '🔧 관리자 - 문제 관리';
+    loadProblems(); // 문제 목록 로드
+  } else if (screenId === 'grading') {
+    problemScreen.classList.add('hidden');
+    gradingScreen.classList.remove('hidden');
+    document.querySelector('.header h1').textContent = '🔧 관리자 - 채점 관리';
+    loadGradingList();
+  }
+}
+
+// 관리 모드 선택 버튼
+document.getElementById('problemManagementBtn')?.addEventListener('click', () => {
+  showScreen('problem');
+});
+
+document.getElementById('gradingManagementBtn')?.addEventListener('click', () => {
+  showScreen('grading');
+});
+
 // 인증 상태 확인
 onAuthStateChanged(auth, (user) => {
   if (user) {
@@ -46,7 +73,7 @@ onAuthStateChanged(auth, (user) => {
       return;
     }
     currentUser = user;
-    loadProblems();
+    // 초기 로드 시 문제 목록은 로드하지 않음 (버튼 클릭 시 로드)
   } else {
     window.location.href = '/';
   }
@@ -639,4 +666,229 @@ function showStatus(message, type) {
 document.getElementById('filterGradeList')?.addEventListener('change', loadProblems);
 document.getElementById('filterUnitList')?.addEventListener('change', loadProblems);
 document.getElementById('loadProblemsBtn')?.addEventListener('click', loadProblems);
+
+// 채점 관리 기능
+async function loadGradingList() {
+  const container = document.getElementById('gradingList');
+  container.innerHTML = '<p>로딩 중...</p>';
+  
+  try {
+    const filterGrade = document.getElementById('gradingFilterGrade').value;
+    const filterUnit = document.getElementById('gradingFilterUnit').value;
+    const filterStatus = document.getElementById('gradingFilterStatus').value;
+    
+    // 서술형 문제가 있는 결과만 가져오기 (인덱스 문제를 피하기 위해 단순 쿼리 사용)
+    let resultsQuery = query(collection(db, 'results'), orderBy('timestamp', 'desc'));
+    const resultsSnapshot = await getDocs(resultsQuery);
+    
+    const results = [];
+    resultsSnapshot.forEach((doc) => {
+      const data = { id: doc.id, ...doc.data() };
+      
+      // 서술형 문제가 없는 결과는 제외
+      if (!data.drawingProblems || data.drawingProblems === 0) return;
+      
+      if (filterGrade && data.grade !== parseInt(filterGrade)) return;
+      if (filterUnit && data.unit !== parseInt(filterUnit)) return;
+      
+      // 채점 상태 필터
+      if (filterStatus === 'ungraded') {
+        if (data.drawingGrading && Object.keys(data.drawingGrading).length > 0) return;
+      } else if (filterStatus === 'graded') {
+        if (!data.drawingGrading || Object.keys(data.drawingGrading).length === 0) return;
+      }
+      
+      results.push(data);
+    });
+    
+    if (results.length === 0) {
+      container.innerHTML = '<p>채점할 서술형 문제가 없습니다.</p>';
+      return;
+    }
+    
+    container.innerHTML = '';
+    
+    // 각 결과에 대해 서술형 문제 표시
+    for (const result of results) {
+      // 서술형 문제 ID 찾기
+      const drawingProblemIds = [];
+      if (result.answers) {
+        // 문제 컬렉션에서 서술형 문제 찾기
+        const problemsQuery = query(
+          collection(db, 'problems'),
+          where('grade', '==', result.grade),
+          where('unit', '==', result.unit),
+          where('difficulty', '==', result.difficulty),
+          where('type', '==', 'drawing')
+        );
+        const problemsSnapshot = await getDocs(problemsQuery);
+        problemsSnapshot.forEach((doc) => {
+          const problemId = doc.id;
+          if (result.answers[problemId]) {
+            drawingProblemIds.push({ problemId, problemData: { id: doc.id, ...doc.data() } });
+          }
+        });
+      }
+      
+      if (drawingProblemIds.length === 0) continue;
+      
+      const resultDiv = document.createElement('div');
+      resultDiv.className = 'problem-item';
+      resultDiv.style.marginBottom = '30px';
+      
+      const date = new Date(result.timestamp.toDate()).toLocaleString('ko-KR');
+      const drawingGrading = result.drawingGrading || {};
+      
+      const contentId = `grading-content-${result.id}`;
+      const toggleBtnId = `grading-toggle-${result.id}`;
+      
+      let problemsHtml = '';
+      for (const { problemId, problemData } of drawingProblemIds) {
+        const answerImage = result.answers[problemId];
+        const isGraded = drawingGrading[problemId] !== undefined;
+        const isCorrect = drawingGrading[problemId] === true;
+        
+        const imageHtml = answerImage 
+          ? `<img src="${answerImage}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin: 10px 0; display: block;">`
+          : '<p style="color: #C62828;">답안 이미지가 없습니다.</p>';
+        
+        const gradingStatus = isGraded 
+          ? (isCorrect ? '<span style="color: #4CAF50; font-weight: bold;">✓ 정답</span>' : '<span style="color: #C62828; font-weight: bold;">✗ 오답</span>')
+          : '<span style="color: #8B8BAA;">미채점</span>';
+        
+        problemsHtml += `
+          <div style="margin: 15px 0; padding: 15px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
+            <div style="font-weight: bold; margin-bottom: 10px; color: #6B6B8A;">문제: ${problemData.question || '문제 내용 없음'}</div>
+            ${problemData.imageUrl ? `<img src="${problemData.imageUrl}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin: 10px 0; display: block;">` : ''}
+            <div style="margin: 10px 0;">
+              <strong>학생 답안:</strong>
+              ${imageHtml}
+            </div>
+            <div style="margin: 10px 0;">
+              <strong>채점 상태:</strong> ${gradingStatus}
+            </div>
+            ${!isGraded ? `
+              <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button class="btn btn-success" onclick="gradeDrawing('${result.id}', '${problemId}', true)" style="flex: 1;">
+                  ✓ 정답
+                </button>
+                <button class="btn btn-danger" onclick="gradeDrawing('${result.id}', '${problemId}', false)" style="flex: 1;">
+                  ✗ 오답
+                </button>
+              </div>
+            ` : `
+              <div style="margin-top: 15px;">
+                <button class="btn btn-secondary" onclick="gradeDrawing('${result.id}', '${problemId}', ${!isCorrect})" style="width: 100%;">
+                  채점 변경 (${isCorrect ? '오답으로' : '정답으로'})
+                </button>
+              </div>
+            `}
+          </div>
+        `;
+      }
+      
+      resultDiv.innerHTML = `
+        <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #E5DDFF;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1;">
+              <strong style="font-size: 18px; color: #6B6B8A;">${result.userName}</strong>
+              <div style="color: #8B8BAA; margin-top: 5px;">
+                ${result.grade}학년 ${result.unit}단원 - ${['쉬움', '보통', '어려움'][result.difficulty - 1]} | 
+                ${date} | 
+                현재 점수: ${result.score}점
+              </div>
+            </div>
+            <div>
+              <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+                펼치기
+              </button>
+            </div>
+          </div>
+        </div>
+        <p style="margin-bottom: 10px; color: #8B8BAA;">서술형 문제 ${drawingProblemIds.length}개</p>
+        <div id="${contentId}" style="margin-top: 15px; display: none;">
+          ${problemsHtml}
+        </div>
+      `;
+      
+      container.appendChild(resultDiv);
+      
+      // 접기/펼치기 버튼 이벤트
+      const toggleBtn = document.getElementById(toggleBtnId);
+      const contentDiv = document.getElementById(contentId);
+      
+      toggleBtn.addEventListener('click', () => {
+        if (contentDiv.style.display === 'none') {
+          contentDiv.style.display = 'block';
+          toggleBtn.textContent = '접기';
+        } else {
+          contentDiv.style.display = 'none';
+          toggleBtn.textContent = '펼치기';
+        }
+      });
+    }
+  } catch (error) {
+    console.error('채점 목록 로드 오류:', error);
+    container.innerHTML = '<p style="color: #C62828;">채점 목록을 불러오는 중 오류가 발생했습니다: ' + error.message + '</p>';
+  }
+}
+
+// 서술형 문제 채점
+window.gradeDrawing = async function(resultId, problemId, isCorrect) {
+  try {
+    const resultDoc = await getDoc(doc(db, 'results', resultId));
+    if (!resultDoc.exists()) {
+      alert('결과를 찾을 수 없습니다.');
+      return;
+    }
+    
+    const result = resultDoc.data();
+    const drawingGrading = result.drawingGrading || {};
+    const previousGrading = drawingGrading[problemId];
+    
+    // 이전 채점 상태 확인
+    const wasGraded = previousGrading !== undefined;
+    const wasCorrect = previousGrading === true;
+    
+    // 점수 재계산
+    let correctCount = result.correctCount || 0;
+    
+    if (wasGraded) {
+      // 이전에 채점된 경우: 이전 채점 결과를 제거하고 새 결과 추가
+      if (wasCorrect) {
+        correctCount -= 1; // 이전 정답 제거
+      }
+    }
+    
+    // 새 채점 결과 추가
+    if (isCorrect) {
+      correctCount += 1;
+    }
+    
+    // drawingGrading 업데이트
+    drawingGrading[problemId] = isCorrect;
+    
+    // 전체 문제 수 계산 (자동 채점 + 서술형)
+    const totalGraded = (result.autoGradedProblems || 0) + (result.drawingProblems || 0);
+    const newScore = totalGraded > 0 ? Math.round((correctCount / totalGraded) * 100) : 0;
+    
+    await updateDoc(doc(db, 'results', resultId), {
+      drawingGrading: drawingGrading,
+      correctCount: correctCount,
+      score: newScore
+    });
+    
+    alert(isCorrect ? '정답으로 채점되었습니다.' : '오답으로 채점되었습니다.');
+    loadGradingList();
+  } catch (error) {
+    console.error('채점 오류:', error);
+    alert('채점 중 오류가 발생했습니다: ' + error.message);
+  }
+};
+
+// 채점 필터 변경 이벤트
+document.getElementById('gradingFilterGrade')?.addEventListener('change', loadGradingList);
+document.getElementById('gradingFilterUnit')?.addEventListener('change', loadGradingList);
+document.getElementById('gradingFilterStatus')?.addEventListener('change', loadGradingList);
+document.getElementById('loadGradingBtn')?.addEventListener('click', loadGradingList);
 
