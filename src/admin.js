@@ -44,12 +44,12 @@ function showScreen(screenId) {
   if (screenId === 'problem') {
     problemScreen.classList.remove('hidden');
     gradingScreen.classList.add('hidden');
-    document.querySelector('.header h1').textContent = '🔧 관리자 - 문제 관리';
+    document.querySelector('.header h1').textContent = '🔧 관리자 페이지';
     loadProblems(); // 문제 목록 로드
   } else if (screenId === 'grading') {
     problemScreen.classList.add('hidden');
     gradingScreen.classList.remove('hidden');
-    document.querySelector('.header h1').textContent = '🔧 관리자 - 채점 관리';
+    document.querySelector('.header h1').textContent = '🔧 관리자 페이지';
     loadGradingList();
   }
 }
