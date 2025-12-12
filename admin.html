@@ -21,14 +21,14 @@
       top: 10px;
       left: 15px;
       color: #000000;
-      font-size: 15px;
+      font-size: 17px;
       z-index: 1000;
       font-family: 'HakgyoansimDunggeunmiso', 'Malgun Gothic', sans-serif;
       margin-bottom: 20px;
     }
     .header {
       background: linear-gradient(135deg, #DDDDFF 0%, #E5DDFF 100%);
-      color: #6B6B8A;
+      color: #000000;
       padding: 20px;
       padding-top: 50px;
       display: flex;
@@ -52,21 +52,21 @@
       padding: 12px 24px;
       border: none;
       border-radius: 8px;
-      font-size: 16px;
+      font-size: 20px;
       cursor: pointer;
       margin: 5px;
       transition: all 0.3s;
     }
     .btn-primary {
       background: #DDDDFF;
-      color: #6B6B8A;
+      color: #000000;
     }
     .btn-primary:hover {
       background: #E5DDFF;
     }
     .btn-secondary {
       background: #E5DDFF;
-      color: #6B6B8A;
+      color: #000000;
     }
     .btn:hover {
       background: #F5F5FF !important;
@@ -74,11 +74,11 @@
     }
     .btn-success {
       background: #DDFFDD;
-      color: #6B6B8A;
+      color: #000000;
     }
     .btn-danger {
       background: #FFDDDD;
-      color: #6B6B8A;
+      color: #000000;
     }
     .form-group {
       margin: 20px 0;
@@ -87,7 +87,7 @@
       display: block;
       margin-bottom: 8px;
       font-weight: bold;
-      color: #6B6B8A;
+      color: #000000;
     }
     .form-group select,
     .form-group input,
@@ -97,9 +97,9 @@
       border: 2px solid #E5DDFF;
       background: #FFFFFF;
       border-radius: 8px;
-      font-size: 16px;
+      font-size: 20px;
       font-family: inherit;
-      color: #6B6B8A;
+      color: #000000;
     }
     .form-group textarea {
       min-height: 100px;
@@ -143,7 +143,7 @@
     .pdf-text {
       white-space: pre-wrap;
       font-family: 'HakgyoansimDunggeunmiso', 'Malgun Gothic', monospace;
-      font-size: 14px;
+      font-size: 16px;
     }
     .hidden {
       display: none;
@@ -155,12 +155,12 @@
     }
     .status-success {
       background: #F0FFF0;
-      color: #6B6B8A;
+      color: #000000;
       border: 1px solid #DDFFDD;
     }
     .status-error {
       background: #FFF0F0;
-      color: #6B6B8A;
+      color: #000000;
       border: 1px solid #FFDDDD;
     }
     .problem-list {
@@ -183,10 +183,10 @@
     <div class="card" style="background: #E5DDFF; border-left: 4px solid #DDDDFF;">
       <h2 style="text-align: center;">관리 모드 선택</h2>
       <div style="display: flex; gap: 15px; margin-top: 20px;">
-        <button class="btn" id="problemManagementBtn" style="flex: 1; padding: 20px; font-size: 18px; background: #FFFFFF; color: #6B6B8A; border: 2px solid #DDDDFF; border-radius: 10px;">
+        <button class="btn" id="problemManagementBtn" style="flex: 1; padding: 20px; font-size: 20px; background: #FFFFFF; color: #000000; border: 2px solid #DDDDFF; border-radius: 10px;">
           📝 문제 관리
         </button>
-        <button class="btn" id="gradingManagementBtn" style="flex: 1; padding: 20px; font-size: 18px; background: #FFFFFF; color: #6B6B8A; border: 2px solid #DDDDFF; border-radius: 10px;">
+        <button class="btn" id="gradingManagementBtn" style="flex: 1; padding: 20px; font-size: 20px; background: #FFFFFF; color: #000000; border: 2px solid #DDDDFF; border-radius: 10px;">
           ✅ 채점 관리
         </button>
       </div>
@@ -208,7 +208,7 @@
     <!-- PDF 업로드 및 파싱 -->
     <div class="card">
       <h2>📄 1단계: PDF에서 문제 텍스트 추출</h2>
-      <p style="color: #666; margin-bottom: 20px;">
+      <p style="color: #000000; margin-bottom: 20px;">
         단원평가 PDF 파일을 업로드하여 텍스트를 추출합니다. 추출된 텍스트를 참고하여 아래에서 문제를 입력하세요.
       </p>
       <div class="form-group">
@@ -225,7 +225,7 @@
     <!-- 문제 수동 입력 -->
     <div class="card">
       <h2>📝 2단계: 문제 입력 및 Firestore 저장</h2>
-      <p style="color: #666; margin-bottom: 20px;">
+      <p style="color: #000000; margin-bottom: 20px;">
         위에서 추출한 PDF 텍스트를 참고하여 각 문제를 입력하세요. 저장된 문제는 학생이 단원을 선택하면 <strong>자동으로 로드</strong>됩니다.
       </p>
       <div class="form-group">
@@ -266,7 +266,7 @@
       <div class="form-group">
         <label>문제 이미지 (선택사항)</label>
         <input type="file" id="problemImage" accept="image/png,image/jpeg,image/jpg">
-        <small style="color: #8B8BAA; display: block; margin-top: 5px;">PNG, JPEG, JPG 파일만 업로드 가능합니다.</small>
+        <small style="color: #000000; display: block; margin-top: 5px;">PNG, JPEG, JPG 파일만 업로드 가능합니다.</small>
         <div id="imagePreview" style="margin-top: 10px; display: none;">
           <img id="previewImg" style="max-width: 300px; max-height: 300px; border-radius: 8px; border: 2px solid #E5DDFF;" />
           <button type="button" class="btn btn-danger" id="removeImageBtn" style="margin-top: 10px; display: block;">이미지 제거</button>
@@ -303,7 +303,7 @@
         <input type="text" id="problemAnswer" placeholder="정답을 입력하세요">
       </div>
       <div id="drawingSection" class="form-group hidden">
-        <p style="color: #8B8BAA; font-size: 14px;">서술형 문제는 학생이 그림판으로 답안을 그려서 제출합니다. 정답은 필요하지 않습니다.</p>
+        <p style="color: #000000; font-size: 16px;">서술형 문제는 학생이 그림판으로 답안을 그려서 제출합니다. 정답은 필요하지 않습니다.</p>
       </div>
       <button class="btn btn-success" id="addProblemBtn">문제 추가</button>
     </div>
@@ -311,7 +311,7 @@
     <!-- 저장된 문제 목록 -->
     <div class="card">
       <h2>✅ 저장된 문제 목록 (학생 화면에서 자동 로드됨)</h2>
-      <p style="color: #666; margin-bottom: 20px;">
+      <p style="color: #000000; margin-bottom: 20px;">
         아래 목록에 표시된 문제들이 학생 화면에서 자동으로 로드됩니다. 학생이 해당 학년/단원을 선택하면 Firestore에서 문제를 가져옵니다.
       </p>
       <div class="form-group">
@@ -344,7 +344,7 @@
     <div id="gradingManagementScreen" class="hidden">
       <div class="card">
         <h2>✅ 서술형 문제 채점</h2>
-        <p style="color: #666; margin-bottom: 20px;">
+        <p style="color: #000000; margin-bottom: 20px;">
           학생이 제출한 서술형 문제를 채점하고, 정답/오답을 선택하면 학생의 전체 점수가 자동으로 업데이트됩니다.
         </p>
         <div class="form-group">

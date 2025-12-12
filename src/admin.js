@@ -754,11 +754,11 @@ async function loadGradingList() {
         
         const gradingStatus = isGraded 
           ? (isCorrect ? '<span style="color: #4CAF50; font-weight: bold;">✓ 정답</span>' : '<span style="color: #C62828; font-weight: bold;">✗ 오답</span>')
-          : '<span style="color: #8B8BAA;">미채점</span>';
+          : '<span style="color: #000000;">미채점</span>';
         
         problemsHtml += `
           <div style="margin: 15px 0; padding: 15px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
-            <div style="font-weight: bold; margin-bottom: 10px; color: #6B6B8A;">문제: ${problemData.question || '문제 내용 없음'}</div>
+            <div style="font-weight: bold; margin-bottom: 10px; color: #000000;">문제: ${problemData.question || '문제 내용 없음'}</div>
             ${problemData.imageUrl ? `<img src="${problemData.imageUrl}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; margin: 10px 0; display: block;">` : ''}
             <div style="margin: 10px 0;">
               <strong>학생 답안:</strong>
@@ -791,21 +791,21 @@ async function loadGradingList() {
         <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #E5DDFF;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="flex: 1;">
-              <strong style="font-size: 18px; color: #6B6B8A;">${result.userName}</strong>
-              <div style="color: #8B8BAA; margin-top: 5px;">
+              <strong style="font-size: 20px; color: #000000;">${result.userName}</strong>
+              <div style="color: #000000; margin-top: 5px;">
                 ${result.grade}학년 ${result.unit}단원 - ${['쉬움', '보통', '어려움'][result.difficulty - 1]} | 
                 ${date} | 
                 현재 점수: ${result.score}점
               </div>
             </div>
             <div>
-              <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+              <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 16px;">
                 펼치기
               </button>
             </div>
           </div>
         </div>
-        <p style="margin-bottom: 10px; color: #8B8BAA;">서술형 문제 ${drawingProblemIds.length}개</p>
+        <p style="margin-bottom: 10px; color: #000000;">서술형 문제 ${drawingProblemIds.length}개</p>
         <div id="${contentId}" style="margin-top: 15px; display: none;">
           ${problemsHtml}
         </div>
@@ -852,17 +852,27 @@ window.gradeDrawing = async function(resultId, problemId, isCorrect) {
     
     // 점수 재계산
     let correctCount = result.correctCount || 0;
+    let wrongCount = result.wrongCount || 0;
     
     if (wasGraded) {
       // 이전에 채점된 경우: 이전 채점 결과를 제거하고 새 결과 추가
-      if (wasCorrect) {
-        correctCount -= 1; // 이전 정답 제거
+      if (wasCorrect && !isCorrect) {
+        // 정답 -> 오답으로 변경
+        correctCount -= 1;
+        wrongCount += 1;
+      } else if (!wasCorrect && isCorrect) {
+        // 오답 -> 정답으로 변경
+        wrongCount -= 1;
+        correctCount += 1;
       }
-    }
-    
-    // 새 채점 결과 추가
-    if (isCorrect) {
-      correctCount += 1;
+      // 같은 결과면 변경 없음
+    } else {
+      // 이전에 채점되지 않은 경우: 새 채점 결과 추가
+      if (isCorrect) {
+        correctCount += 1;
+      } else {
+        wrongCount += 1;
+      }
     }
     
     // drawingGrading 업데이트
@@ -875,6 +885,7 @@ window.gradeDrawing = async function(resultId, problemId, isCorrect) {
     await updateDoc(doc(db, 'results', resultId), {
       drawingGrading: drawingGrading,
       correctCount: correctCount,
+      wrongCount: wrongCount,
       score: newScore
     });
     

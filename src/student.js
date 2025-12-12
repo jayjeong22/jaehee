@@ -186,7 +186,7 @@ function renderQuestions() {
       img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
       img.onerror = function() {
         this.style.display = 'none';
-        imageDiv.innerHTML = '<p style="color: #999;">이미지를 불러올 수 없습니다.</p>';
+        imageDiv.innerHTML = '<p style="color: #000000;">이미지를 불러올 수 없습니다.</p>';
       };
       imageDiv.appendChild(img);
       questionDiv.appendChild(imageDiv);
@@ -307,8 +307,8 @@ function checkAnswerImmediate(problem, userAnswer, element) {
   const feedbackDiv = document.getElementById(`feedback-${problem.id}`);
   if (feedbackDiv) {
     feedbackDiv.innerHTML = isCorrect 
-      ? '<span style="color: #2E7D32; font-weight: bold; font-size: 18px;">✓ 정답입니다!</span>'
-      : '<span style="color: #C62828; font-weight: bold; font-size: 18px;">✗ 오답입니다.</span>';
+      ? '<span style="color: #2E7D32; font-weight: bold; font-size: 22px;">✓ 정답입니다!</span>'
+      : '<span style="color: #C62828; font-weight: bold; font-size: 22px;">✗ 오답입니다.</span>';
   }
   
   updateProgress();
@@ -404,7 +404,7 @@ function showResult() {
   const createNoteBtn = document.getElementById('createNoteBtn');
   
   if (wrongProblems.length === 0) {
-    wrongContainer.innerHTML = '<p style="color: #2E7D32; font-weight: bold; font-size: 20px;">모든 문제를 맞추셨습니다! 🎉</p>';
+    wrongContainer.innerHTML = '<p style="color: #2E7D32; font-weight: bold; font-size: 22px;">모든 문제를 맞추셨습니다! 🎉</p>';
     // 오답노트 버튼 숨기기
     if (createNoteBtn) {
       createNoteBtn.style.display = 'none';
@@ -576,7 +576,7 @@ function showNoteCreateScreen() {
     if (problem.type === 'multiple' && problem.options && problem.options.length > 0) {
       optionsHtml = `
         <div style="margin: 15px 0; padding: 15px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
-          <div style="font-weight: bold; margin-bottom: 10px; color: #6B6B8A;">보기:</div>
+          <div style="font-weight: bold; margin-bottom: 10px; color: #000000;">보기:</div>
           <div style="display: flex; flex-direction: column; gap: 8px;">
             ${problem.options.map((option, optIndex) => {
               const isCorrect = optIndex === problem.correct;
@@ -641,7 +641,7 @@ function showNoteCreateScreen() {
             class="note-text-input" 
             placeholder="오답 노트를 입력하세요..."
             rows="6"
-            style="width: 100%; padding: 12px; border: 2px solid #E5DDFF; border-radius: 8px; font-size: 16px; font-family: 'HakgyoansimDunggeunmiso', 'Malgun Gothic', sans-serif; resize: vertical;"
+            style="width: 100%; padding: 12px; border: 2px solid #E5DDFF; border-radius: 8px; font-size: 18px; font-family: 'HakgyoansimDunggeunmiso', 'Malgun Gothic', sans-serif; resize: vertical;"
           ></textarea>
           <!-- 그리기 모드 (숨김) -->
           <div id="note-drawing-${problem.id}" style="display: none;">
@@ -1329,7 +1329,7 @@ function getNoteContentHtml(noteProblem) {
     return `
       <div style="margin-top: 15px;">
         <strong>오답노트 (직접 쓰기):</strong>
-        <div style="margin-top: 10px; padding: 12px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px; white-space: pre-wrap; font-size: 16px; line-height: 1.6;">
+        <div style="margin-top: 10px; padding: 12px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px; white-space: pre-wrap; font-size: 18px; line-height: 1.6;">
           ${noteProblem.content}
         </div>
       </div>
@@ -1455,7 +1455,7 @@ async function showNoteDetail(noteId, note) {
     if (problem.type === 'multiple' && problem.options && problem.options.length > 0) {
       optionsHtml = `
         <div style="margin: 15px 0; padding: 15px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
-          <div style="font-weight: bold; margin-bottom: 10px; color: #6B6B8A;">보기:</div>
+          <div style="font-weight: bold; margin-bottom: 10px; color: #000000;">보기:</div>
           <div style="display: flex; flex-direction: column; gap: 8px;">
             ${problem.options.map((option, optIndex) => {
               const isCorrect = optIndex === problem.correct;

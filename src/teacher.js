@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, query, orderBy, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig.js';
 import { problems } from './data/problems.js';
 import { isAdmin } from './adminConfig.js';
@@ -47,12 +47,35 @@ async function loadAllData() {
       problemTypeMap[problem.id] = problem.type || 'unknown';
     });
 
-    // 결과 데이터 로드
+    // 결과 데이터 실시간 리스너 설정
     const resultsQuery = query(collection(db, 'results'), orderBy('timestamp', 'desc'));
-    const resultsSnapshot = await getDocs(resultsQuery);
-    allResults = [];
-    resultsSnapshot.forEach((doc) => {
-      allResults.push({ id: doc.id, ...doc.data() });
+    onSnapshot(resultsQuery, (snapshot) => {
+      allResults = [];
+      snapshot.forEach((doc) => {
+        allResults.push({ id: doc.id, ...doc.data() });
+      });
+      
+      // 현재 선택된 학생이 있으면 상세 화면 업데이트
+      if (selectedStudent) {
+        const studentData = {
+          userName: selectedStudent.userName,
+          results: allResults.filter(r => r.userId === selectedStudent.userId),
+          totalScore: 0,
+          totalTests: 0,
+          totalWrong: 0
+        };
+        
+        // 통계 재계산
+        studentData.results.forEach(result => {
+          studentData.totalScore += result.score;
+          studentData.totalTests++;
+          studentData.totalWrong += result.wrongCount || 0;
+        });
+        
+        showStudentDetail(selectedStudent.userId, studentData);
+      }
+      
+      renderOverview();
     });
 
     // 오답노트 데이터 로드
@@ -62,8 +85,6 @@ async function loadAllData() {
     notesSnapshot.forEach((doc) => {
       allNotes.push({ id: doc.id, ...doc.data() });
     });
-
-    renderOverview();
   } catch (error) {
     console.error('데이터 로드 오류:', error);
   }
@@ -372,7 +393,7 @@ async function renderStudentNotes(userId) {
           : '';
         
         // 문제 텍스트
-        const questionHtml = `<div style="margin-bottom: 15px; font-size: 15px; line-height: 1.6; color: #333;">${problemData.question}</div>`;
+        const questionHtml = `<div style="margin-bottom: 15px; font-size: 17px; line-height: 1.6; color: #000000;">${problemData.question}</div>`;
         
         // 객관식 선택지
         let optionsHtml = '';
@@ -386,7 +407,7 @@ async function renderStudentNotes(userId) {
                   ? 'color: #4CAF50; font-weight: bold;'
                   : isUserAnswer 
                   ? 'color: #C62828; font-weight: bold;'
-                  : 'color: #666;';
+                  : 'color: #000000;';
                 
                 return `
                   <div style="${optionStyle} margin: 5px 0;">
@@ -433,15 +454,15 @@ async function renderStudentNotes(userId) {
         // 직접 쓰기 모드
         noteContentHtml = `
           <div style="margin-top: 10px; padding: 12px; background: #F5F5FF; border: 2px solid #E5DDFF; border-radius: 8px;">
-            <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">오답노트 (직접 쓰기):</div>
-            <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #333;">${p.content}</div>
+            <div style="font-weight: bold; margin-bottom: 8px; color: #000000;">오답노트 (직접 쓰기):</div>
+            <div style="white-space: pre-wrap; font-size: 18px; line-height: 1.6; color: #000000;">${p.content}</div>
           </div>
         `;
       } else if (p.mode === 'drawing' && p.drawing) {
         // 그리기 모드
         noteContentHtml = `
           <div style="margin-top: 10px;">
-            <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">오답노트 (그리기):</div>
+            <div style="font-weight: bold; margin-bottom: 8px; color: #000000;">오답노트 (그리기):</div>
             <img src="${p.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; display: block;">
           </div>
         `;
@@ -449,7 +470,7 @@ async function renderStudentNotes(userId) {
         // 기존 데이터 호환성 (mode가 없는 경우)
         noteContentHtml = `
           <div style="margin-top: 10px;">
-            <div style="font-weight: bold; margin-bottom: 8px; color: #6B6B8A;">오답노트:</div>
+            <div style="font-weight: bold; margin-bottom: 8px; color: #000000;">오답노트:</div>
             <img src="${p.drawing}" style="max-width: 100%; border: 2px solid #E5DDFF; border-radius: 8px; display: block;">
           </div>
         `;
@@ -457,10 +478,10 @@ async function renderStudentNotes(userId) {
       
       return `
         <div style="margin: 10px 0; padding: 15px; background: #FFFFFF; border: 2px solid #E5DDFF; border-radius: 8px;">
-          <div style="font-weight: bold; margin-bottom: 12px; color: #6B6B8A; font-size: 16px;">문제 ${idx + 1}</div>
+          <div style="font-weight: bold; margin-bottom: 12px; color: #000000; font-size: 18px;">문제 ${idx + 1}</div>
           ${problemHtml}
           <div style="margin-top: 15px; margin-bottom: 8px; padding: 10px; background: #FFF5F5; border-left: 3px solid #E57373; border-radius: 4px;">
-            <span style="font-weight: bold; color: #6B6B8A;">오답 원인:</span> 
+            <span style="font-weight: bold; color: #000000;">오답 원인:</span> 
             <span style="color: #C62828; font-weight: bold;">${reasonText}</span>
           </div>
           ${noteContentHtml}
@@ -477,15 +498,15 @@ async function renderStudentNotes(userId) {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div style="flex: 1;">
         <strong>${note.grade}학년 ${note.unit}단원 - ${['쉬움', '보통', '어려움'][note.difficulty - 1]}</strong>
-          <span style="color: #8B8BAA; font-size: 14px; margin-left: 10px;">
+          <span style="color: #000000; font-size: 18px; margin-left: 10px;">
           ${new Date(note.timestamp.toDate()).toLocaleString('ko-KR')}
         </span>
       </div>
         <div style="display: flex; gap: 10px;">
-          <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 14px;">
+          <button id="${toggleBtnId}" class="btn btn-secondary" style="padding: 8px 16px; font-size: 18px;">
             펼치기
           </button>
-          <button id="${deleteBtnId}" class="btn btn-danger" style="padding: 8px 16px; font-size: 14px;">
+          <button id="${deleteBtnId}" class="btn btn-danger" style="padding: 8px 16px; font-size: 18px;">
             삭제
           </button>
         </div>
@@ -618,7 +639,7 @@ function renderResultsTable(results) {
       
       tableHTML += `
         <tr style="${rowStyle}">
-          <td><strong style="color: #1976D2; font-size: 14px;">${attemptLabel}</strong></td>
+          <td><strong style="color: #1976D2; font-size: 18px;">${attemptLabel}</strong></td>
           <td>${date}</td>
           <td>${gradeText}</td>
           <td>${unitText}</td>
@@ -628,7 +649,7 @@ function renderResultsTable(results) {
           <td>${result.wrongCount}</td>
           <td>${result.score}점</td>
           <td>
-            <button class="btn btn-danger" onclick="deleteResult('${result.id}')" style="padding: 5px 10px; font-size: 12px;">삭제</button>
+            <button class="btn btn-danger" onclick="deleteResult('${result.id}')" style="padding: 5px 10px; font-size: 14px;">삭제</button>
           </td>
         </tr>
       `;
