@@ -50,9 +50,9 @@ async function loadAllData() {
     // 결과 데이터 실시간 리스너 설정
     const resultsQuery = query(collection(db, 'results'), orderBy('timestamp', 'desc'));
     onSnapshot(resultsQuery, (snapshot) => {
-      allResults = [];
+    allResults = [];
       snapshot.forEach((doc) => {
-        allResults.push({ id: doc.id, ...doc.data() });
+      allResults.push({ id: doc.id, ...doc.data() });
       });
       
       // 현재 선택된 학생이 있으면 상세 화면 업데이트
@@ -621,7 +621,7 @@ function renderResultsTable(results) {
   // 그룹별로 결과 표시 (같은 학년/단원/난이도는 함께 표시)
   groupedResults.forEach((groupResults, key) => {
     groupResults.forEach((result, index) => {
-      const date = new Date(result.timestamp.toDate()).toLocaleString('ko-KR');
+    const date = new Date(result.timestamp.toDate()).toLocaleString('ko-KR');
       const attemptNumber = result.attemptNumber || 1;
       const attemptLabel = `${attemptNumber}차`;
       
@@ -637,22 +637,22 @@ function renderResultsTable(results) {
         ? 'background-color: #FFF3E0;' 
         : 'background-color: #FFEBEE;';
       
-      tableHTML += `
+    tableHTML += `
         <tr style="${rowStyle}">
           <td><strong style="color: #1976D2; font-size: 18px;">${attemptLabel}</strong></td>
-          <td>${date}</td>
+        <td>${date}</td>
           <td>${gradeText}</td>
           <td>${unitText}</td>
           <td>${difficultyText}</td>
-          <td>${result.totalProblems}</td>
-          <td>${result.correctCount}</td>
-          <td>${result.wrongCount}</td>
-          <td>${result.score}점</td>
+        <td>${result.totalProblems}</td>
+        <td>${result.correctCount}</td>
+        <td>${result.wrongCount}</td>
+        <td>${result.score}점</td>
           <td>
             <button class="btn btn-danger" onclick="deleteResult('${result.id}')" style="padding: 5px 10px; font-size: 14px;">삭제</button>
           </td>
-        </tr>
-      `;
+      </tr>
+    `;
     });
   });
 
