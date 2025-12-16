@@ -39,26 +39,68 @@ onAuthStateChanged(auth, async (user) => {
 // Firestore에서 문제 로드
 async function loadProblemsFromFirestore() {
   try {
+    console.log('📥 Firestore에서 문제 로드 시작...');
+    if (!db) {
+      console.error('❌ Firestore db가 초기화되지 않았습니다!');
+      return;
+    }
+    
     const querySnapshot = await getDocs(collection(db, 'problems'));
+    console.log(`📦 Firestore에서 ${querySnapshot.size}개의 문서를 가져왔습니다.`);
+    
     firestoreProblems = {};
     let problemCount = 0;
+    let skippedCount = 0;
+    
+    // 모든 문서를 먼저 로그로 출력
+    querySnapshot.forEach((doc) => {
+      console.log(`📄 문서 ID: ${doc.id}`, doc.data());
+    });
     
     querySnapshot.forEach((doc) => {
-      const problem = { id: doc.id, ...doc.data() };
-      const grade = parseInt(problem.grade); // 숫자로 변환
-      const unit = parseInt(problem.unit); // 숫자로 변환
-      let difficulty = problem.difficulty;
+      const problemData = doc.data();
+      console.log(`🔍 처리 중인 문제:`, { id: doc.id, data: problemData });
       
-      // difficulty가 숫자가 아니면 변환 시도
+      const problem = { 
+        id: doc.id, 
+        ...problemData
+      };
+      
+      // 숫자 변환 (Firestore는 숫자를 그대로 저장하지만, 안전하게 처리)
+      let grade = problemData.grade;
+      let unit = problemData.unit;
+      let difficulty = problemData.difficulty;
+      
+      if (typeof grade !== 'number') {
+        grade = parseInt(grade);
+      }
+      if (typeof unit !== 'number') {
+        unit = parseInt(unit);
+      }
       if (typeof difficulty !== 'number') {
         difficulty = parseInt(difficulty);
       }
       
+      console.log(`  → 변환 결과: grade=${grade} (${typeof grade}), unit=${unit} (${typeof unit}), difficulty=${difficulty} (${typeof difficulty})`);
+      
       // 유효성 검사
-      if (!grade || !unit || !difficulty || difficulty < 1 || difficulty > 3) {
-        console.warn('잘못된 문제 데이터:', problem);
-        return; // 잘못된 데이터는 건너뛰기
+      if (isNaN(grade) || isNaN(unit) || isNaN(difficulty) || 
+          grade < 1 || grade > 6 || 
+          unit < 1 || unit > 6 || 
+          difficulty < 1 || difficulty > 3) {
+        console.warn('⚠️ 잘못된 문제 데이터 (건너뜀):', {
+          id: problem.id,
+          원본: { grade: problemData.grade, unit: problemData.unit, difficulty: problemData.difficulty },
+          변환후: { grade, unit, difficulty }
+        });
+        skippedCount++;
+        return;
       }
+      
+      // 문제 객체에 변환된 값 저장
+      problem.grade = grade;
+      problem.unit = unit;
+      problem.difficulty = difficulty;
       
       if (!firestoreProblems[grade]) {
         firestoreProblems[grade] = {};
@@ -71,22 +113,51 @@ async function loadProblemsFromFirestore() {
       if (difficultyKey) {
         firestoreProblems[grade][unit][difficultyKey].push(problem);
         problemCount++;
+        console.log(`  ✅ 문제 추가 성공: ${grade}학년 ${unit}단원 ${difficultyKey} (ID: ${problem.id})`);
+        console.log(`     문제 내용: ${problem.question?.substring(0, 50)}...`);
       } else {
-        console.warn('잘못된 난이도 값:', difficulty, problem);
+        console.warn('⚠️ 잘못된 난이도 값:', difficulty, problem);
+        skippedCount++;
       }
     });
     
-    console.log(`✅ Firestore에서 ${problemCount}개의 문제를 로드했습니다.`);
+    console.log(`\n✅ 최종 결과: Firestore에서 ${problemCount}개의 문제를 로드했습니다. (건너뛴 문제: ${skippedCount}개)`);
+    console.log(`📊 firestoreProblems 전체 구조:`, JSON.stringify(firestoreProblems, null, 2));
+    
     if (problemCount > 0) {
-      console.log('저장된 문제 구조:', Object.keys(firestoreProblems).map(g => 
-        `${g}학년: ${Object.keys(firestoreProblems[g] || {}).map(u => 
-          `${u}단원 (쉬움:${firestoreProblems[g][u]?.easy?.length || 0}, 보통:${firestoreProblems[g][u]?.medium?.length || 0}, 어려움:${firestoreProblems[g][u]?.hard?.length || 0})`
-        ).join(', ')}`
-      ).join(' | '));
+      console.log('\n📊 저장된 문제 구조 요약:');
+      let summaryText = `✅ Firestore에서 ${problemCount}개의 문제를 로드했습니다!\n\n`;
+      Object.keys(firestoreProblems).sort((a, b) => parseInt(a) - parseInt(b)).forEach(g => {
+        console.log(`  ${g}학년:`);
+        summaryText += `${g}학년:\n`;
+        Object.keys(firestoreProblems[g]).sort((a, b) => parseInt(a) - parseInt(b)).forEach(u => {
+          const unitData = firestoreProblems[g][u];
+          const easyCount = unitData.easy?.length || 0;
+          const mediumCount = unitData.medium?.length || 0;
+          const hardCount = unitData.hard?.length || 0;
+          const total = easyCount + mediumCount + hardCount;
+          console.log(`    ${u}단원: 쉬움 ${easyCount}개, 보통 ${mediumCount}개, 어려움 ${hardCount}개`);
+          if (total > 0) {
+            summaryText += `  ${u}단원: 쉬움 ${easyCount}개, 보통 ${mediumCount}개, 어려움 ${hardCount}개\n`;
+          }
+        });
+      });
+      
+      // 화면에 표시 (페이지 로드 시 한 번만)
+      if (problemCount > 0) {
+        setTimeout(() => {
+          alert(summaryText);
+        }, 500);
+      }
+    } else {
+      console.log('⚠️ Firestore에 저장된 문제가 없습니다!');
+      alert('⚠️ Firestore에 저장된 문제가 없습니다!\n\n관리자 페이지에서 문제를 등록해주세요.');
     }
   } catch (error) {
-    console.error('Firestore 문제 로드 오류:', error);
-    // 오류가 발생해도 로컬 문제를 사용할 수 있도록 계속 진행
+    console.error('❌ Firestore 문제 로드 오류:', error);
+    console.error('오류 상세:', error.message);
+    console.error('오류 스택:', error.stack);
+    firestoreProblems = {}; // 오류 발생 시 빈 객체로 초기화
   }
 }
 
@@ -133,12 +204,15 @@ document.querySelectorAll('.difficulty-btn').forEach(btn => {
 async function startQuiz() {
   // 문제 로드가 완료될 때까지 대기
   if (!problemsLoaded) {
-    console.log('문제 로드 중... 잠시만 기다려주세요.');
+    console.log('⏳ 문제 로드 중... 잠시만 기다려주세요.');
     // 최대 5초 대기
     let waitCount = 0;
     while (!problemsLoaded && waitCount < 50) {
       await new Promise(resolve => setTimeout(resolve, 100));
       waitCount++;
+    }
+    if (!problemsLoaded) {
+      console.warn('⚠️ 문제 로드가 완료되지 않았지만 계속 진행합니다.');
     }
   }
   
@@ -151,51 +225,121 @@ async function startQuiz() {
   
   const difficultyKey = ['easy', 'medium', 'hard'][currentDifficulty - 1];
   
-  // Firestore에서 문제를 우선적으로 사용, 없으면 로컬 문제 사용
-  let gradeProblems = firestoreProblems[currentGrade];
+  console.log(`🔍 문제 검색 시작:`);
+  console.log(`  - 학년: ${currentGrade}`);
+  console.log(`  - 단원: ${currentUnit}`);
+  console.log(`  - 난이도: ${difficultyKey} (${currentDifficulty})`);
+  console.log(`  - Firestore 문제 로드 완료: ${problemsLoaded}`);
+  console.log(`  - Firestore 문제 구조:`, firestoreProblems);
+  
+  // ===== 핵심: Firestore 문제를 절대 우선으로 사용 =====
   let usingFirestore = false;
+  currentProblems = [];
   
-  console.log(`🔍 문제 검색: ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도`);
-  console.log('Firestore 문제 구조:', firestoreProblems);
+  console.log(`\n🔍 문제 검색 시작:`);
+  console.log(`   선택: ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도 (${currentDifficulty})`);
+  console.log(`   firestoreProblems 타입:`, typeof firestoreProblems);
+  console.log(`   firestoreProblems 전체:`, firestoreProblems);
+  console.log(`   firestoreProblems 키 목록:`, Object.keys(firestoreProblems));
   
-  if (gradeProblems && gradeProblems[currentUnit] && 
-      gradeProblems[currentUnit][difficultyKey] && 
-      gradeProblems[currentUnit][difficultyKey].length > 0) {
-    // Firestore에 문제가 있으면 사용
+  // 1단계: Firestore 문제 확인 (가장 우선)
+  const firestoreGrade = firestoreProblems[currentGrade];
+  console.log(`   ${currentGrade}학년 존재:`, !!firestoreGrade);
+  if (firestoreGrade) {
+    console.log(`   ${currentGrade}학년의 단원 목록:`, Object.keys(firestoreGrade));
+  }
+  
+  const firestoreUnit = firestoreGrade?.[currentUnit];
+  console.log(`   ${currentGrade}학년 ${currentUnit}단원 존재:`, !!firestoreUnit);
+  if (firestoreUnit) {
+    console.log(`   ${currentUnit}단원의 난이도 목록:`, Object.keys(firestoreUnit));
+    console.log(`   ${currentUnit}단원의 각 난이도 문제 수:`, {
+      easy: firestoreUnit.easy?.length || 0,
+      medium: firestoreUnit.medium?.length || 0,
+      hard: firestoreUnit.hard?.length || 0
+    });
+  }
+  
+  const firestoreDifficultyProblems = firestoreUnit?.[difficultyKey];
+  console.log(`   ${difficultyKey} 난이도 문제 존재:`, !!firestoreDifficultyProblems);
+  console.log(`   ${difficultyKey} 난이도 문제 수:`, firestoreDifficultyProblems?.length || 0);
+  
+  if (firestoreDifficultyProblems && Array.isArray(firestoreDifficultyProblems) && firestoreDifficultyProblems.length > 0) {
+    // Firestore에 문제가 있으면 무조건 Firestore 문제 사용
     usingFirestore = true;
-    console.log(`✅ Firestore에서 ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도 문제 ${gradeProblems[currentUnit][difficultyKey].length}개를 로드했습니다.`);
+    currentProblems = firestoreDifficultyProblems.map(p => ({ ...p })); // 깊은 복사
+    console.log(`\n✅✅✅ [Firestore 문제 사용] ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도 문제 ${currentProblems.length}개를 로드했습니다! ✅✅✅`);
+    console.log(`   문제 목록:`);
+    currentProblems.forEach((p, idx) => {
+      console.log(`     ${idx + 1}. ID: ${p.id}, 문제: ${p.question?.substring(0, 60)}...`);
+    });
+    
+    // 화면에 표시
+    alert(`✅ Firestore에서 ${currentProblems.length}개의 문제를 로드했습니다!\n\n${currentProblems.map((p, idx) => `${idx + 1}. ${p.question?.substring(0, 40)}...`).join('\n')}`);
   } else {
-    // Firestore에 문제가 없으면 로컬 문제 사용
-    gradeProblems = localProblems[currentGrade];
-    console.log(`ℹ️ Firestore에 문제가 없어 로컬 예시 문제를 사용합니다.`);
-    if (gradeProblems && gradeProblems[currentUnit] && gradeProblems[currentUnit][difficultyKey]) {
-      console.log(`로컬 문제: ${gradeProblems[currentUnit][difficultyKey].length}개`);
+    // Firestore에 해당 학년/단원/난이도 문제가 없음
+    console.log(`\n⚠️⚠️⚠️ Firestore에 ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도 문제가 없습니다! ⚠️⚠️⚠️`);
+    console.log(`   상세 디버그 정보:`, {
+      전체_학년_목록: Object.keys(firestoreProblems),
+      해당_학년_존재: !!firestoreGrade,
+      해당_학년_단원_목록: firestoreGrade ? Object.keys(firestoreGrade) : [],
+      해당_단원_존재: !!firestoreUnit,
+      해당_단원_난이도_목록: firestoreUnit ? Object.keys(firestoreUnit) : [],
+      해당_난이도_존재: !!firestoreDifficultyProblems,
+      해당_난이도_문제수: firestoreDifficultyProblems?.length || 0,
+      firestoreProblems_전체구조: JSON.stringify(firestoreProblems, null, 2)
+    });
+    
+    // Firestore에 아예 문제가 하나도 없는지 확인
+    const hasAnyFirestoreProblems = Object.keys(firestoreProblems).length > 0;
+    console.log(`   Firestore에 문제가 있는가:`, hasAnyFirestoreProblems);
+    
+    if (hasAnyFirestoreProblems) {
+      // Firestore에 다른 학년/단원 문제는 있지만, 선택한 학년/단원/난이도에는 없음
+      console.log(`   ⚠️ Firestore에 다른 문제는 있지만, 선택한 ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도 문제는 없습니다.`);
+      
+      // Firestore에 어떤 문제가 있는지 표시
+      let availableInfo = 'Firestore에 저장된 문제:\n';
+      Object.keys(firestoreProblems).sort().forEach(g => {
+        Object.keys(firestoreProblems[g]).sort().forEach(u => {
+          const unitData = firestoreProblems[g][u];
+          const total = (unitData.easy?.length || 0) + (unitData.medium?.length || 0) + (unitData.hard?.length || 0);
+          if (total > 0) {
+            availableInfo += `- ${g}학년 ${u}단원: ${total}개\n`;
+          }
+        });
+      });
+      
+      alert(`❌ Firestore에 ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도 문제가 등록되지 않았습니다.\n\n${availableInfo}\n\n관리자 페이지에서 문제를 등록해주세요.`);
+      showScreen('unitSelectScreen');
+      return;
+    } else {
+      // Firestore에 문제가 전혀 없음 - 로컬 예시 문제 사용 (개발/테스트용)
+      console.log(`   ℹ️ Firestore에 문제가 전혀 없어 로컬 예시 문제를 사용합니다. (개발/테스트용)`);
+      if (localProblems[currentGrade] && localProblems[currentGrade][currentUnit] && localProblems[currentGrade][currentUnit][difficultyKey]) {
+        currentProblems = [...localProblems[currentGrade][currentUnit][difficultyKey]];
+        console.log(`   로컬 예시 문제 ${currentProblems.length}개를 사용합니다.`);
+      } else {
+        console.log(`   로컬 예시 문제도 없습니다.`);
+        currentProblems = [];
+      }
     }
   }
   
-  if (!gradeProblems || !gradeProblems[currentUnit]) {
-    alert('아직 문제가 업로드되지 않았습니다. 다른 항목을 선택해주세요.');
-    showScreen('unitSelectScreen');
-    return;
+  // 문제 ID가 없으면 추가 (Firestore 문제는 이미 id가 있음, 로컬 문제만 ID 추가)
+  if (!usingFirestore) {
+    currentProblems = currentProblems.map((problem, index) => {
+      if (!problem.id) {
+        problem.id = `local-${currentGrade}-${currentUnit}-${difficultyKey}-${index}`;
+      }
+      return problem;
+    });
   }
   
-  currentProblems = gradeProblems[currentUnit][difficultyKey] || [];
-  
-  if (currentProblems.length === 0) {
-    alert('아직 문제가 업로드되지 않았습니다. 다른 항목을 선택해주세요.');
-    showScreen('unitSelectScreen');
-    return;
-  }
-  
-  // 문제 ID가 없으면 추가 (Firestore 문제는 이미 id가 있음)
-  currentProblems = currentProblems.map((problem, index) => {
-    if (!problem.id) {
-      problem.id = problem.id || `local-${currentGrade}-${currentUnit}-${difficultyKey}-${index}`;
-    }
-    return problem;
+  console.log(`📝 최종 선택된 문제 ${currentProblems.length}개 (${usingFirestore ? '🔥 Firestore' : '💾 로컬'}):`);
+  currentProblems.forEach((p, idx) => {
+    console.log(`   ${idx + 1}. ID: ${p.id || '(없음)'}, 문제: ${p.question?.substring(0, 50)}...`);
   });
-  
-  console.log(`📝 최종 선택된 문제 ${currentProblems.length}개:`, currentProblems.map(p => ({ id: p.id, question: p.question?.substring(0, 30) + '...' })));
   
   userAnswers = {};
   showScreen('quizScreen');
