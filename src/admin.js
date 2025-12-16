@@ -37,31 +37,61 @@ let problemIdCounter = 1;
 let editingProblemId = null; // 현재 수정 중인 문제 ID
 
 // 화면 전환
+// 활성 메뉴 버튼 설정
+function setActiveMenuButton(activeBtnId) {
+  document.querySelectorAll('.header-menu-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(activeBtnId);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+}
+
 function showScreen(screenId) {
   const problemScreen = document.getElementById('problemManagementScreen');
   const gradingScreen = document.getElementById('gradingManagementScreen');
   
+  if (!problemScreen || !gradingScreen) {
+    console.error('화면 요소를 찾을 수 없습니다.');
+    return;
+  }
+  
   if (screenId === 'problem') {
     problemScreen.classList.remove('hidden');
     gradingScreen.classList.add('hidden');
-    document.querySelector('.header h1').textContent = '🔧 관리자 페이지';
+    setActiveMenuButton('problemManagementBtn');
     loadProblems(); // 문제 목록 로드
   } else if (screenId === 'grading') {
     problemScreen.classList.add('hidden');
     gradingScreen.classList.remove('hidden');
-    document.querySelector('.header h1').textContent = '🔧 관리자 페이지';
+    setActiveMenuButton('gradingManagementBtn');
     loadGradingList();
+    loadFeedbackList(); // 피드백 목록도 함께 로드
   }
 }
 
-// 관리 모드 선택 버튼
-document.getElementById('problemManagementBtn')?.addEventListener('click', () => {
-  showScreen('problem');
-});
+// 관리 모드 선택 버튼 이벤트 (DOM 로드 후 등록)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('problemManagementBtn')?.addEventListener('click', () => {
+      showScreen('problem');
+    });
 
-document.getElementById('gradingManagementBtn')?.addEventListener('click', () => {
-  showScreen('grading');
-});
+    document.getElementById('gradingManagementBtn')?.addEventListener('click', () => {
+      showScreen('grading');
+    });
+  });
+} else {
+  // DOM이 이미 로드된 경우
+  document.getElementById('problemManagementBtn')?.addEventListener('click', () => {
+    showScreen('problem');
+  });
+
+  document.getElementById('gradingManagementBtn')?.addEventListener('click', () => {
+    showScreen('grading');
+  });
+}
 
 // 인증 상태 확인
 onAuthStateChanged(auth, (user) => {
@@ -73,7 +103,9 @@ onAuthStateChanged(auth, (user) => {
       return;
     }
     currentUser = user;
-    // 초기 로드 시 문제 목록은 로드하지 않음 (버튼 클릭 시 로드)
+    
+    // 초기 로드 시 문제 관리 화면 표시
+    showScreen('problem');
   } else {
     window.location.href = '/';
   }
@@ -783,6 +815,13 @@ async function loadGradingList() {
                 </button>
               </div>
             `}
+            <div style="margin-top: 15px;">
+              <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #000000;">선생님 피드백:</label>
+              <textarea id="feedback-${result.id}-${problemId}" placeholder="학생에게 전달할 피드백을 입력하세요..." style="width: 100%; padding: 10px; border: 2px solid #E5DDFF; border-radius: 8px; font-size: 16px; font-family: inherit; min-height: 80px; resize: vertical; color: #000000;"></textarea>
+              <button class="btn btn-primary" onclick="sendFeedback('${result.id}', '${result.userId}', '${result.userName}', '${problemId}', '${result.grade}', '${result.unit}')" style="margin-top: 10px; width: 100%;">
+                피드백 전송
+              </button>
+            </div>
           </div>
         `;
       }
@@ -897,9 +936,187 @@ window.gradeDrawing = async function(resultId, problemId, isCorrect) {
   }
 };
 
+// 피드백 전송 함수
+window.sendFeedback = async function(resultId, studentId, studentName, problemId, grade, unit) {
+  try {
+    const feedbackTextarea = document.getElementById(`feedback-${resultId}-${problemId}`);
+    if (!feedbackTextarea) {
+      alert('피드백 입력 칸을 찾을 수 없습니다.');
+      return;
+    }
+    
+    const feedbackContent = feedbackTextarea.value.trim();
+    if (!feedbackContent) {
+      alert('피드백 내용을 입력해주세요.');
+      return;
+    }
+    
+    // 문제 정보 가져오기
+    let problemTitle = '문제 피드백';
+    try {
+      const problemDoc = await getDoc(doc(db, 'problems', problemId));
+      if (problemDoc.exists()) {
+        const problemData = problemDoc.data();
+        if (problemData.question) {
+          // 문제 제목 정리: 끝의 연속된 온점 제거 후 처리
+          let question = problemData.question.trim();
+          // 끝의 연속된 온점(., ... 등) 제거
+          question = question.replace(/\.+$/, '');
+          
+          // 문제 제목이 10자 이상이면 자르고 "." 하나만 추가
+          if (question.length > 10) {
+            problemTitle = question.substring(0, 10) + '.';
+          } else {
+            problemTitle = question;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('문제 정보 가져오기 오류:', error);
+    }
+    
+    // Firestore에 피드백 저장
+    await addDoc(collection(db, 'feedback'), {
+      studentId: studentId,
+      studentName: studentName,
+      resultId: resultId,
+      problemId: problemId,
+      grade: parseInt(grade),
+      unit: parseInt(unit),
+      title: `${grade}학년 ${unit}단원 - ${problemTitle}`,
+      content: feedbackContent,
+      timestamp: new Date(),
+      teacherId: currentUser.uid,
+      teacherName: currentUser.displayName || currentUser.email || '선생님'
+    });
+    
+    alert('피드백이 전송되었습니다!');
+    feedbackTextarea.value = ''; // 입력 칸 비우기
+  } catch (error) {
+    console.error('피드백 전송 오류:', error);
+    alert('피드백 전송 중 오류가 발생했습니다: ' + error.message);
+  }
+};
+
 // 채점 필터 변경 이벤트
 document.getElementById('gradingFilterGrade')?.addEventListener('change', loadGradingList);
 document.getElementById('gradingFilterUnit')?.addEventListener('change', loadGradingList);
 document.getElementById('gradingFilterStatus')?.addEventListener('change', loadGradingList);
 document.getElementById('loadGradingBtn')?.addEventListener('click', loadGradingList);
+
+// 피드백 관리 기능
+document.getElementById('feedbackFilterGrade')?.addEventListener('change', loadFeedbackList);
+document.getElementById('feedbackFilterUnit')?.addEventListener('change', loadFeedbackList);
+document.getElementById('feedbackFilterStudent')?.addEventListener('change', loadFeedbackList);
+document.getElementById('loadFeedbackBtn')?.addEventListener('click', loadFeedbackList);
+
+// 피드백 목록 로드
+async function loadFeedbackList() {
+  const container = document.getElementById('feedbackList');
+  if (!container) return;
+  
+  container.innerHTML = '<p>로딩 중...</p>';
+  
+  try {
+    const filterGrade = document.getElementById('feedbackFilterGrade')?.value;
+    const filterUnit = document.getElementById('feedbackFilterUnit')?.value;
+    const filterStudent = document.getElementById('feedbackFilterStudent')?.value;
+    
+    // 모든 피드백 가져오기
+    const feedbackQuery = query(collection(db, 'feedback'), orderBy('timestamp', 'desc'));
+    const feedbackSnapshot = await getDocs(feedbackQuery);
+    
+    const feedbacks = [];
+    feedbackSnapshot.forEach((doc) => {
+      const feedback = { id: doc.id, ...doc.data() };
+      
+      // 필터링
+      if (filterGrade && feedback.grade !== parseInt(filterGrade)) return;
+      if (filterUnit && feedback.unit !== parseInt(filterUnit)) return;
+      if (filterStudent && feedback.studentId !== filterStudent) return;
+      
+      feedbacks.push(feedback);
+    });
+    
+    // 학생 목록 업데이트
+    const studentSet = new Set();
+    feedbackSnapshot.forEach((doc) => {
+      const feedback = doc.data();
+      if (feedback.studentName) {
+        studentSet.add(JSON.stringify({ id: feedback.studentId, name: feedback.studentName }));
+      }
+    });
+    
+    const studentSelect = document.getElementById('feedbackFilterStudent');
+    if (studentSelect) {
+      const currentValue = studentSelect.value;
+      studentSelect.innerHTML = '<option value="">전체 학생</option>';
+      Array.from(studentSet).forEach(studentStr => {
+        const student = JSON.parse(studentStr);
+        const option = document.createElement('option');
+        option.value = student.id;
+        option.textContent = student.name;
+        if (currentValue === student.id) {
+          option.selected = true;
+        }
+        studentSelect.appendChild(option);
+      });
+    }
+    
+    if (feedbacks.length === 0) {
+      container.innerHTML = '<p>피드백이 없습니다.</p>';
+      return;
+    }
+    
+    container.innerHTML = '';
+    
+    feedbacks.forEach((feedback) => {
+      const feedbackDiv = document.createElement('div');
+      feedbackDiv.className = 'problem-item';
+      feedbackDiv.style.marginBottom = '20px';
+      
+      const timestamp = feedback.timestamp?.toDate ? feedback.timestamp.toDate() : new Date(feedback.timestamp);
+      
+      feedbackDiv.innerHTML = `
+        <div style="padding: 20px; background: #FFFFFF; border-radius: 10px; border-left: 4px solid #DDDDFF; box-shadow: 0 2px 5px rgba(221, 221, 255, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div>
+              <h3 style="color: #000000; margin: 0;">${feedback.title || '피드백'}</h3>
+              <p style="color: #000000; margin: 5px 0; font-size: 14px;">
+                학생: ${feedback.studentName || '알 수 없음'} | ${feedback.grade}학년 ${feedback.unit}단원
+              </p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <span style="color: #000000; font-size: 14px;">${timestamp.toLocaleString('ko-KR')}</span>
+              <button class="btn btn-danger" onclick="deleteFeedback('${feedback.id}')" style="padding: 5px 10px; font-size: 14px;">삭제</button>
+            </div>
+          </div>
+          <div style="color: #000000; line-height: 1.8; font-size: 16px; white-space: pre-wrap; padding: 15px; background: #F5F5FF; border-radius: 8px;">${feedback.content || '내용 없음'}</div>
+        </div>
+      `;
+      
+      container.appendChild(feedbackDiv);
+    });
+  } catch (error) {
+    console.error('피드백 로드 오류:', error);
+    container.innerHTML = '<p style="color: #C62828;">피드백을 불러오는 중 오류가 발생했습니다: ' + error.message + '</p>';
+  }
+}
+
+// 피드백 삭제 함수
+window.deleteFeedback = async function(feedbackId) {
+  if (!confirm('이 피드백을 삭제하시겠습니까?')) {
+    return;
+  }
+  
+  try {
+    await deleteDoc(doc(db, 'feedback', feedbackId));
+    showStatus('피드백이 삭제되었습니다.', 'success');
+    loadFeedbackList();
+  } catch (error) {
+    console.error('피드백 삭제 오류:', error);
+    showStatus('피드백 삭제에 실패했습니다: ' + error.message, 'error');
+  }
+};
+
 

@@ -40,37 +40,63 @@
     .role-btn {
       display: block;
       width: 100%;
-      padding: 15px;
+      padding: 16px;
       margin: 10px 0;
-      border: 2px solid #DDDDFF;
-      background: #FFFFFF;
-      color: #000000;
-      border-radius: 10px;
+      border: none;
+      background: #f1f5ff;
+      color: #4f46e5;
+      border-radius: 18px;
       font-size: 18px;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: all 0.15s ease;
+      /* 입체 효과 (Soft UI) */
+      box-shadow:
+        8px 8px 16px rgba(79, 70, 229, 0.18),
+        -8px -8px 16px #ffffff;
     }
     .role-btn:hover {
-      background: #DDDDFF;
-      color: #000000;
+      background: #e0e7ff;
+      box-shadow:
+        6px 6px 12px rgba(79, 70, 229, 0.2),
+        -6px -6px 12px #ffffff;
+    }
+    .role-btn:active {
+      box-shadow:
+        inset 6px 6px 12px rgba(79, 70, 229, 0.2),
+        inset -6px -6px 12px #ffffff;
     }
     .google-btn {
       width: 100%;
-      padding: 12px;
-      background: #E5DDFF;
-      color: #000000;
+      padding: 16px;
+      background: #f1f5ff;
+      color: #4f46e5;
       border: none;
-      border-radius: 10px;
+      border-radius: 18px;
       font-size: 18px;
+      font-weight: 700;
       cursor: pointer;
       margin-top: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
+      transition: all 0.15s ease;
+      /* 입체 효과 (Soft UI) */
+      box-shadow:
+        8px 8px 16px rgba(79, 70, 229, 0.18),
+        -8px -8px 16px #ffffff;
     }
     .google-btn:hover {
-      background: #DDDDFF;
+      background: #e0e7ff;
+      box-shadow:
+        6px 6px 12px rgba(79, 70, 229, 0.2),
+        -6px -6px 12px #ffffff;
+    }
+    .google-btn:active {
+      box-shadow:
+        inset 6px 6px 12px rgba(79, 70, 229, 0.2),
+        inset -6px -6px 12px #ffffff;
     }
     .user-info {
       margin-top: 20px;
@@ -93,6 +119,24 @@
     }
     .login-container {
       margin-top: 40px;
+    }
+    #goAdminBtn {
+      background: #fff1f2 !important;
+      color: #dc2626 !important;
+      box-shadow:
+        8px 8px 16px rgba(220, 38, 38, 0.18),
+        -8px -8px 16px #ffffff !important;
+    }
+    #goAdminBtn:hover {
+      background: #ffe4e6 !important;
+      box-shadow:
+        6px 6px 12px rgba(220, 38, 38, 0.2),
+        -6px -6px 12px #ffffff !important;
+    }
+    #goAdminBtn:active {
+      box-shadow:
+        inset 6px 6px 12px rgba(220, 38, 38, 0.2),
+        inset -6px -6px 12px #ffffff !important;
     }
   </style>
 </head>
@@ -121,7 +165,7 @@
       <div class="role-selector" style="margin-top: 20px;">
         <button class="role-btn" id="goStudentBtn">👨‍🎓 학생</button>
         <button class="role-btn" id="goTeacherBtn">👩‍🏫 교사</button>
-        <button class="role-btn" id="goAdminBtn" style="background: #FFE5DD; color: #000000; border-color: #FFE5DD;">🔧 관리자 페이지</button>
+        <button class="role-btn" id="goAdminBtn">🔧 관리자 페이지</button>
       </div>
     </div>
   </div>

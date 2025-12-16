@@ -14,14 +14,21 @@ let wrongProblems = [];
 let currentNoteData = null;
 let firestoreProblems = {}; // Firestore에서 로드한 문제들
 let nextAttemptNumber = null; // 재도전 시 미리 계산된 다음 시도 번호
+let scoreTrendChart = null;
+let problemTypeChart = null;
+let allResults = []; // 모든 결과 데이터
 
 // 인증 상태 확인
 onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser = user;
-    document.getElementById('userName').textContent = user.displayName || user.email;
+    const userName = user.displayName || user.email || '학생';
+    document.getElementById('userName').textContent = userName;
+    
+    
     loadProblemsFromFirestore(); // Firestore에서 문제 로드
     loadNotes();
+    loadAllResults(); // 모든 결과 데이터 로드
   } else {
     window.location.href = '/';
   }
@@ -67,7 +74,10 @@ function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(screen => {
     screen.classList.remove('active');
   });
-  document.getElementById(screenId).classList.add('active');
+  const targetScreen = document.getElementById(screenId);
+  if (targetScreen) {
+    targetScreen.classList.add('active');
+  }
 }
 
 // 단원 선택 화면 이벤트
@@ -1226,10 +1236,48 @@ document.getElementById('cancelNoteBtn')?.addEventListener('click', () => {
   showScreen('resultScreen');
 });
 
-// 오답노트 보기
+// 헤더 메뉴 버튼 이벤트
+function setActiveMenuButton(activeBtnId) {
+  document.querySelectorAll('.header-menu-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(activeBtnId);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+}
+
+document.getElementById('problemSolvingBtn')?.addEventListener('click', () => {
+  setActiveMenuButton('problemSolvingBtn');
+  showScreen('unitSelectScreen');
+});
+
 document.getElementById('viewNotesBtn')?.addEventListener('click', () => {
+  setActiveMenuButton('viewNotesBtn');
   loadNotes();
   showScreen('notesListScreen');
+});
+
+document.getElementById('teacherFeedbackBtn')?.addEventListener('click', () => {
+  setActiveMenuButton('teacherFeedbackBtn');
+  loadTeacherFeedback();
+  showScreen('teacherFeedbackScreen');
+});
+
+document.getElementById('statsDashboardBtn')?.addEventListener('click', () => {
+  setActiveMenuButton('statsDashboardBtn');
+  loadStudentStats();
+  showScreen('statsDashboardScreen');
+});
+
+document.getElementById('backToMenuFromFeedbackBtn')?.addEventListener('click', () => {
+  setActiveMenuButton('problemSolvingBtn');
+  showScreen('unitSelectScreen');
+});
+
+
+document.getElementById('backToMenuFromFeedbackBtn')?.addEventListener('click', () => {
+  showScreen('unitSelectScreen');
 });
 
 // 오답노트 로드
@@ -1580,10 +1628,443 @@ document.getElementById('backToSelectBtn')?.addEventListener('click', () => {
 });
 
 document.getElementById('backToSelectFromNotesBtn')?.addEventListener('click', () => {
+  setActiveMenuButton('problemSolvingBtn');
   showScreen('unitSelectScreen');
 });
+
+// 교사 피드백 로드
+async function loadTeacherFeedback() {
+  if (!currentUser) {
+    console.error('currentUser가 없습니다.');
+    return;
+  }
+  
+  const feedbackList = document.getElementById('feedbackList');
+  if (!feedbackList) {
+    console.error('feedbackList 요소를 찾을 수 없습니다.');
+    return;
+  }
+  
+  feedbackList.innerHTML = '<p>피드백을 불러오는 중...</p>';
+  
+  try {
+    // Firestore에서 해당 학생의 피드백 가져오기
+    // orderBy와 where를 함께 사용할 때 인덱스 문제를 피하기 위해
+    // 먼저 studentId로 필터링한 후 클라이언트 측에서 정렬
+    const q = query(
+      collection(db, 'feedback'),
+      where('studentId', '==', currentUser.uid)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    feedbackList.innerHTML = '';
+    
+    if (querySnapshot.empty) {
+      feedbackList.innerHTML = '<p style="text-align: center; padding: 40px; color: #000000;">아직 선생님의 피드백이 없습니다.</p>';
+      return;
+    }
+    
+    // 결과를 배열로 변환하고 클라이언트 측에서 정렬
+    const feedbacks = [];
+    querySnapshot.forEach((doc) => {
+      const feedback = { id: doc.id, ...doc.data() };
+      const timestamp = feedback.timestamp?.toDate 
+        ? feedback.timestamp.toDate() 
+        : (feedback.timestamp ? new Date(feedback.timestamp) : new Date());
+      feedbacks.push({
+        ...feedback,
+        timestampValue: timestamp.getTime()
+      });
+    });
+    
+    // 타임스탬프 기준으로 내림차순 정렬
+    feedbacks.sort((a, b) => b.timestampValue - a.timestampValue);
+    
+    // 정렬된 피드백들을 표시
+    feedbacks.forEach((feedback) => {
+      const feedbackDiv = document.createElement('div');
+      feedbackDiv.className = 'note-item';
+      feedbackDiv.style.marginBottom = '20px';
+      
+      const timestamp = feedback.timestamp?.toDate 
+        ? feedback.timestamp.toDate() 
+        : (feedback.timestamp ? new Date(feedback.timestamp) : new Date());
+      
+      feedbackDiv.innerHTML = `
+        <div style="padding: 20px; background: #FFFFFF; border-radius: 10px; border-left: 4px solid #DDDDFF; box-shadow: 0 2px 5px rgba(221, 221, 255, 0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="color: #000000; margin: 0;">${feedback.title || '피드백'}</h3>
+            <span style="color: #000000; font-size: 14px;">${timestamp.toLocaleString('ko-KR')}</span>
+          </div>
+          <div style="color: #000000; line-height: 1.8; font-size: 16px; white-space: pre-wrap;">${feedback.content || '내용 없음'}</div>
+          ${feedback.grade && feedback.unit ? `
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #E5DDFF;">
+              <span style="color: #000000; font-size: 14px;">관련: ${feedback.grade}학년 ${feedback.unit}단원</span>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      
+      feedbackList.appendChild(feedbackDiv);
+    });
+  } catch (error) {
+    console.error('피드백 로드 오류:', error);
+    console.error('오류 상세:', error.message);
+    feedbackList.innerHTML = `<p style="color: #C62828;">피드백을 불러오는 중 오류가 발생했습니다: ${error.message}</p>`;
+  }
+}
 
 document.getElementById('backToNotesListBtn')?.addEventListener('click', () => {
   showScreen('notesListScreen');
 });
+
+// 모든 결과 데이터 로드
+async function loadAllResults() {
+  if (!currentUser) return;
+  
+  try {
+    const q = query(
+      collection(db, 'results'),
+      where('userId', '==', currentUser.uid),
+      orderBy('timestamp', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    allResults = [];
+    querySnapshot.forEach((doc) => {
+      allResults.push({ id: doc.id, ...doc.data() });
+    });
+  } catch (error) {
+    console.error('결과 데이터 로드 오류:', error);
+    // orderBy가 인덱스가 없을 수 있으므로, orderBy 없이 시도
+    try {
+      const q = query(
+        collection(db, 'results'),
+        where('userId', '==', currentUser.uid)
+      );
+      const querySnapshot = await getDocs(q);
+      allResults = [];
+      querySnapshot.forEach((doc) => {
+        allResults.push({ id: doc.id, ...doc.data() });
+      });
+      // 클라이언트 측에서 정렬
+      allResults.sort((a, b) => {
+        const aTime = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+        const bTime = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+        return bTime - aTime;
+      });
+    } catch (error2) {
+      console.error('결과 데이터 로드 오류 (재시도):', error2);
+    }
+  }
+}
+
+// 학생 성적 통계 로드 및 표시
+async function loadStudentStats() {
+  if (!currentUser) return;
+  
+  await loadAllResults(); // 최신 데이터 로드
+  
+  if (allResults.length === 0) {
+    document.getElementById('totalTestsCount').textContent = '0';
+    document.getElementById('avgScoreValue').textContent = '0점';
+    document.getElementById('totalWrongCount').textContent = '0';
+    document.getElementById('improvementRate').textContent = '0%';
+    document.getElementById('topWrongProblemsList').innerHTML = '<p>데이터가 없습니다.</p>';
+    document.getElementById('recentResultsTable').innerHTML = '<p>데이터가 없습니다.</p>';
+    return;
+  }
+  
+  // 기본 통계 계산
+  const totalTests = allResults.length;
+  const totalScore = allResults.reduce((sum, r) => sum + (r.score || 0), 0);
+  const avgScore = Math.round(totalScore / totalTests);
+  const totalWrong = allResults.reduce((sum, r) => sum + (r.wrongCount || 0), 0);
+  
+  // 개선률 계산 (최근 5개와 이전 5개 비교)
+  let improvementRate = 0;
+  if (allResults.length >= 10) {
+    const recent5 = allResults.slice(0, 5);
+    const previous5 = allResults.slice(5, 10);
+    const recentAvg = recent5.reduce((sum, r) => sum + (r.score || 0), 0) / 5;
+    const previousAvg = previous5.reduce((sum, r) => sum + (r.score || 0), 0) / 5;
+    improvementRate = previousAvg > 0 ? Math.round(((recentAvg - previousAvg) / previousAvg) * 100) : 0;
+  }
+  
+  document.getElementById('totalTestsCount').textContent = totalTests;
+  document.getElementById('avgScoreValue').textContent = `${avgScore}점`;
+  document.getElementById('totalWrongCount').textContent = totalWrong;
+  document.getElementById('improvementRate').textContent = `${improvementRate > 0 ? '+' : ''}${improvementRate}%`;
+  
+  // 차트 렌더링
+  renderScoreTrendChart();
+  renderProblemTypeChart();
+  renderTopWrongProblems();
+  renderRecentResults();
+}
+
+// 점수 추이 차트
+function renderScoreTrendChart() {
+  const ctx = document.getElementById('scoreTrendChart');
+  if (!ctx) return;
+  
+  // 학년/단원별로 그룹화
+  const groupedResults = {};
+  allResults.forEach(result => {
+    const key = `${result.grade}학년 ${result.unit}단원`;
+    if (!groupedResults[key]) {
+      groupedResults[key] = [];
+    }
+    groupedResults[key].push(result);
+  });
+  
+  // 각 그룹의 평균 점수 계산
+  const labels = [];
+  const scores = [];
+  
+  Object.keys(groupedResults).sort().forEach(key => {
+    const group = groupedResults[key];
+    const avgScore = Math.round(group.reduce((sum, r) => sum + (r.score || 0), 0) / group.length);
+    labels.push(key);
+    scores.push(avgScore);
+  });
+  
+  if (scoreTrendChart) {
+    scoreTrendChart.destroy();
+  }
+  
+  if (labels.length === 0) {
+    ctx.parentElement.innerHTML = '<p>데이터가 없습니다.</p>';
+    return;
+  }
+  
+  scoreTrendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '평균 점수',
+        data: scores,
+        borderColor: 'rgba(79, 70, 229, 0.8)',
+        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: function(value) {
+              return value + '점';
+            }
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        }
+      }
+    }
+  });
+}
+
+// 문제 유형별 정답률 차트
+function renderProblemTypeChart() {
+  const ctx = document.getElementById('problemTypeChart');
+  if (!ctx) return;
+  
+  const typeStats = {
+    multiple: { total: 0, correct: 0 },
+    short: { total: 0, correct: 0 },
+    drawing: { total: 0, correct: 0 }
+  };
+  
+  // 문제 유형별 통계 계산
+  allResults.forEach(result => {
+    if (result.answers) {
+      Object.keys(result.answers).forEach(problemId => {
+        // 문제 정보 가져오기
+        const problem = firestoreProblems[result.grade]?.[result.unit]?.[['easy', 'medium', 'hard'][result.difficulty - 1]]?.find(p => p.id === problemId);
+        if (problem) {
+          const type = problem.type || 'unknown';
+          if (typeStats[type]) {
+            typeStats[type].total++;
+            // 정답 여부 확인
+            let isCorrect = false;
+            if (problem.type === 'multiple') {
+              isCorrect = result.answers[problemId] === problem.correct;
+            } else if (problem.type === 'short') {
+              isCorrect = String(result.answers[problemId]).trim().toLowerCase() === String(problem.answer).trim().toLowerCase();
+            } else if (problem.type === 'drawing') {
+              if (result.drawingGrading && result.drawingGrading[problemId] !== undefined) {
+                isCorrect = result.drawingGrading[problemId] === true;
+              }
+            }
+            if (isCorrect) {
+              typeStats[type].correct++;
+            }
+          }
+        }
+      });
+    }
+  });
+  
+  const types = ['multiple', 'short', 'drawing'];
+  const typeLabels = ['객관식', '주관식', '서술형'];
+  const correctRates = types.map(type => {
+    const stat = typeStats[type];
+    return stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+  });
+  
+  if (problemTypeChart) {
+    problemTypeChart.destroy();
+  }
+  
+  if (types.every(type => typeStats[type].total === 0)) {
+    ctx.parentElement.innerHTML = '<p>데이터가 없습니다.</p>';
+    return;
+  }
+  
+  problemTypeChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: typeLabels,
+      datasets: [{
+        label: '정답률 (%)',
+        data: correctRates,
+        backgroundColor: [
+          'rgba(79, 70, 229, 0.5)',
+          'rgba(22, 101, 52, 0.5)',
+          'rgba(220, 38, 38, 0.5)'
+        ],
+        borderColor: [
+          'rgba(79, 70, 229, 0.8)',
+          'rgba(22, 101, 52, 0.8)',
+          'rgba(220, 38, 38, 0.8)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: {
+            callback: function(value) {
+              return value + '%';
+            }
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        }
+      }
+    }
+  });
+}
+
+// 가장 많이 틀린 문제 TOP 5
+function renderTopWrongProblems() {
+  const container = document.getElementById('topWrongProblemsList');
+  if (!container) return;
+  
+  const wrongCountMap = new Map();
+  
+  allResults.forEach(result => {
+    if (result.wrongProblems && Array.isArray(result.wrongProblems)) {
+      result.wrongProblems.forEach(problemId => {
+        wrongCountMap.set(problemId, (wrongCountMap.get(problemId) || 0) + 1);
+      });
+    }
+  });
+  
+  const sortedProblems = Array.from(wrongCountMap.entries())
+    .map(([problemId, count]) => {
+      // 문제 정보 찾기
+      let problem = null;
+      for (const grade in firestoreProblems) {
+        for (const unit in firestoreProblems[grade]) {
+          for (const difficulty in firestoreProblems[grade][unit]) {
+            const found = firestoreProblems[grade][unit][difficulty].find(p => p.id === problemId);
+            if (found) {
+              problem = found;
+              break;
+            }
+          }
+          if (problem) break;
+        }
+        if (problem) break;
+      }
+      return { problemId, count, problem };
+    })
+    .filter(item => item.problem)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  
+  if (sortedProblems.length === 0) {
+    container.innerHTML = '<p>틀린 문제 데이터가 없습니다.</p>';
+    return;
+  }
+  
+  let html = '<table style="width: 100%; border-collapse: collapse; margin: 20px 0;"><thead><tr><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">순위</th><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">문제</th><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">오답 횟수</th></tr></thead><tbody>';
+  
+  sortedProblems.forEach((item, index) => {
+    const question = item.problem.question ? (item.problem.question.length > 50 ? item.problem.question.substring(0, 50) + '...' : item.problem.question) : '문제 없음';
+    html += `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;"><strong>${index + 1}</strong></td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;">${question}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;"><strong style="color: #C62828;">${item.count}회</strong></td>
+      </tr>
+    `;
+  });
+  
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// 최근 테스트 결과 테이블
+function renderRecentResults() {
+  const container = document.getElementById('recentResultsTable');
+  if (!container) return;
+  
+  const recentResults = allResults.slice(0, 10);
+  
+  if (recentResults.length === 0) {
+    container.innerHTML = '<p>데이터가 없습니다.</p>';
+    return;
+  }
+  
+  let html = '<table style="width: 100%; border-collapse: collapse; margin: 20px 0;"><thead><tr><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">날짜</th><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">학년/단원</th><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">난이도</th><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">점수</th><th style="padding: 12px; text-align: left; border-bottom: 1px solid #E5DDFF; background: #F5F5FF;">정답/오답</th></tr></thead><tbody>';
+  
+  recentResults.forEach(result => {
+    const date = result.timestamp?.toDate ? result.timestamp.toDate() : new Date(result.timestamp);
+    const difficulty = ['쉬움', '보통', '어려움'][result.difficulty - 1] || '알 수 없음';
+    const scoreColor = result.score >= 80 ? '#4CAF50' : result.score >= 60 ? '#FF9800' : '#C62828';
+    
+    html += `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;">${date.toLocaleString('ko-KR')}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;">${result.grade}학년 ${result.unit}단원</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;">${difficulty}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;"><strong style="color: ${scoreColor};">${result.score}점</strong></td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5DDFF;">${result.correctCount || 0} / ${result.wrongCount || 0}</td>
+      </tr>
+    `;
+  });
+  
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
 
