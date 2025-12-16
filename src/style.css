@@ -89,7 +89,3 @@ button:focus-visible {
     inset 6px 6px 12px rgba(79, 70, 229, 0.2),
     inset -6px -6px 12px #ffffff;
 }
-
-.btn-soft:hover {
-  transform: translateY(-1px);
-}
