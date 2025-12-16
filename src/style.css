@@ -63,3 +63,33 @@ button:focus,
 button:focus-visible {
   outline: 4px auto #DDDDFF;
 }
+
+.btn-soft {
+  background: #f1f5ff;          /* 연한 보라빛 배경 */
+  color: #4f46e5;               /* 글자색 (포인트) */
+
+  padding: 16px 36px;
+  font-size: 16px;
+  font-weight: 700;
+
+  border: none;
+  border-radius: 18px;
+
+  /* 핵심: Soft UI 그림자 */
+  box-shadow:
+    8px 8px 16px rgba(79, 70, 229, 0.18),
+   -8px -8px 16px #ffffff;
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-soft:active {
+  box-shadow:
+    inset 6px 6px 12px rgba(79, 70, 229, 0.2),
+    inset -6px -6px 12px #ffffff;
+}
+
+.btn-soft:hover {
+  transform: translateY(-1px);
+}
