@@ -13,8 +13,8 @@
   # - VITE_FIREBASE_MESSAGING_SENDER_ID
   # - VITE_FIREBASE_APP_ID
   # Firebase API 키는 클라이언트 측에서 사용되므로 공개되어도 안전합니다
-  # Netlify secrets scanning을 조정합니다 (빌드 출력에서 값 숨김)
-  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "true"
+  # Netlify secrets scanning 비활성화 (Firebase 키는 클라이언트 측에서 사용되므로 빌드 출력에 포함됨)
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 [[redirects]]
   from = "/*"
