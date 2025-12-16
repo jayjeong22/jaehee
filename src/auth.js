@@ -52,7 +52,12 @@ onAuthStateChanged(auth, (user) => {
 document.getElementById('googleLoginBtn')?.addEventListener('click', async () => {
   try {
     if (!auth) {
-      alert('Firebase가 초기화되지 않았습니다. 페이지를 새로고침해주세요.');
+      alert('Firebase가 초기화되지 않았습니다.\n\n환경 변수가 설정되었는지 확인하고 페이지를 새로고침해주세요.');
+      return;
+    }
+    
+    if (!googleProvider) {
+      alert('Google 로그인 설정에 오류가 있습니다. 페이지를 새로고침해주세요.');
       return;
     }
     

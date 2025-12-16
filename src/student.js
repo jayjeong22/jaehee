@@ -17,16 +17,18 @@ let nextAttemptNumber = null; // 재도전 시 미리 계산된 다음 시도 �
 let scoreTrendChart = null;
 let problemTypeChart = null;
 let allResults = []; // 모든 결과 데이터
+let problemsLoaded = false; // 문제 로드 완료 플래그
 
 // 인증 상태 확인
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     currentUser = user;
     const userName = user.displayName || user.email || '학생';
     document.getElementById('userName').textContent = userName;
     
     
-    loadProblemsFromFirestore(); // Firestore에서 문제 로드
+    await loadProblemsFromFirestore(); // Firestore에서 문제 로드 (완료될 때까지 대기)
+    problemsLoaded = true;
     loadNotes();
     loadAllResults(); // 모든 결과 데이터 로드
   } else {
@@ -43,9 +45,20 @@ async function loadProblemsFromFirestore() {
     
     querySnapshot.forEach((doc) => {
       const problem = { id: doc.id, ...doc.data() };
-      const grade = problem.grade;
-      const unit = problem.unit;
-      const difficulty = problem.difficulty;
+      const grade = parseInt(problem.grade); // 숫자로 변환
+      const unit = parseInt(problem.unit); // 숫자로 변환
+      let difficulty = problem.difficulty;
+      
+      // difficulty가 숫자가 아니면 변환 시도
+      if (typeof difficulty !== 'number') {
+        difficulty = parseInt(difficulty);
+      }
+      
+      // 유효성 검사
+      if (!grade || !unit || !difficulty || difficulty < 1 || difficulty > 3) {
+        console.warn('잘못된 문제 데이터:', problem);
+        return; // 잘못된 데이터는 건너뛰기
+      }
       
       if (!firestoreProblems[grade]) {
         firestoreProblems[grade] = {};
@@ -55,13 +68,21 @@ async function loadProblemsFromFirestore() {
       }
       
       const difficultyKey = ['easy', 'medium', 'hard'][difficulty - 1];
-      firestoreProblems[grade][unit][difficultyKey].push(problem);
-      problemCount++;
+      if (difficultyKey) {
+        firestoreProblems[grade][unit][difficultyKey].push(problem);
+        problemCount++;
+      } else {
+        console.warn('잘못된 난이도 값:', difficulty, problem);
+      }
     });
     
     console.log(`✅ Firestore에서 ${problemCount}개의 문제를 로드했습니다.`);
     if (problemCount > 0) {
-      console.log('저장된 문제:', firestoreProblems);
+      console.log('저장된 문제 구조:', Object.keys(firestoreProblems).map(g => 
+        `${g}학년: ${Object.keys(firestoreProblems[g] || {}).map(u => 
+          `${u}단원 (쉬움:${firestoreProblems[g][u]?.easy?.length || 0}, 보통:${firestoreProblems[g][u]?.medium?.length || 0}, 어려움:${firestoreProblems[g][u]?.hard?.length || 0})`
+        ).join(', ')}`
+      ).join(' | '));
     }
   } catch (error) {
     console.error('Firestore 문제 로드 오류:', error);
@@ -109,7 +130,18 @@ document.querySelectorAll('.difficulty-btn').forEach(btn => {
 });
 
 // 문제 풀이 시작
-function startQuiz() {
+async function startQuiz() {
+  // 문제 로드가 완료될 때까지 대기
+  if (!problemsLoaded) {
+    console.log('문제 로드 중... 잠시만 기다려주세요.');
+    // 최대 5초 대기
+    let waitCount = 0;
+    while (!problemsLoaded && waitCount < 50) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      waitCount++;
+    }
+  }
+  
   // 제한된 학년/단원 체크
   if (currentGrade === 4 || currentGrade === 6 || (currentGrade === 5 && currentUnit === 4)) {
     alert('아직 문제가 없습니다. 다른 단원을 선택하세요.');
@@ -123,16 +155,22 @@ function startQuiz() {
   let gradeProblems = firestoreProblems[currentGrade];
   let usingFirestore = false;
   
+  console.log(`🔍 문제 검색: ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도`);
+  console.log('Firestore 문제 구조:', firestoreProblems);
+  
   if (gradeProblems && gradeProblems[currentUnit] && 
       gradeProblems[currentUnit][difficultyKey] && 
       gradeProblems[currentUnit][difficultyKey].length > 0) {
     // Firestore에 문제가 있으면 사용
     usingFirestore = true;
-    console.log(`✅ Firestore에서 ${currentGrade}학년 ${currentUnit}단원 문제를 로드했습니다.`);
+    console.log(`✅ Firestore에서 ${currentGrade}학년 ${currentUnit}단원 ${difficultyKey} 난이도 문제 ${gradeProblems[currentUnit][difficultyKey].length}개를 로드했습니다.`);
   } else {
     // Firestore에 문제가 없으면 로컬 문제 사용
     gradeProblems = localProblems[currentGrade];
     console.log(`ℹ️ Firestore에 문제가 없어 로컬 예시 문제를 사용합니다.`);
+    if (gradeProblems && gradeProblems[currentUnit] && gradeProblems[currentUnit][difficultyKey]) {
+      console.log(`로컬 문제: ${gradeProblems[currentUnit][difficultyKey].length}개`);
+    }
   }
   
   if (!gradeProblems || !gradeProblems[currentUnit]) {
@@ -156,6 +194,8 @@ function startQuiz() {
     }
     return problem;
   });
+  
+  console.log(`📝 최종 선택된 문제 ${currentProblems.length}개:`, currentProblems.map(p => ({ id: p.id, question: p.question?.substring(0, 30) + '...' })));
   
   userAnswers = {};
   showScreen('quizScreen');
