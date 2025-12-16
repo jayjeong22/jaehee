@@ -4,6 +4,14 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Firebase 환경 변수는 Netlify 대시보드의 Site settings > Environment variables에서 설정하세요
+  # 다음 변수들을 설정해야 합니다:
+  # - VITE_FIREBASE_API_KEY
+  # - VITE_FIREBASE_AUTH_DOMAIN
+  # - VITE_FIREBASE_PROJECT_ID
+  # - VITE_FIREBASE_STORAGE_BUCKET
+  # - VITE_FIREBASE_MESSAGING_SENDER_ID
+  # - VITE_FIREBASE_APP_ID
 
 [[redirects]]
   from = "/*"

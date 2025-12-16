@@ -6,15 +6,27 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Firebase 프로젝트 설정 정보
-// 환경 변수에서 가져오거나, 없으면 기본값 사용
+// 환경 변수에서 가져옵니다 (Netlify 환경 변수에서 설정 필요)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyB2nuFJX1fu0Hol86D9sCaEfVCCHdQrXtA",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "jaehee-46d1d.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "jaehee-46d1d",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "jaehee-46d1d.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "410935351606",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:410935351606:web:212201fd39c00dcbf17b97"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
+// 환경 변수 확인
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  console.error('Firebase 환경 변수가 설정되지 않았습니다.');
+  console.error('다음 환경 변수를 설정해주세요:');
+  console.error('- VITE_FIREBASE_API_KEY');
+  console.error('- VITE_FIREBASE_AUTH_DOMAIN');
+  console.error('- VITE_FIREBASE_PROJECT_ID');
+  console.error('- VITE_FIREBASE_STORAGE_BUCKET');
+  console.error('- VITE_FIREBASE_MESSAGING_SENDER_ID');
+  console.error('- VITE_FIREBASE_APP_ID');
+}
 
 // Firebase 초기화
 let app;
